@@ -209,13 +209,14 @@ button.icon {
 .build-card {
   --tower: var(--accent);
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(max-content, 1fr) auto;
   grid-template-rows: auto auto;
+  flex: none;
   column-gap: 10px;
   align-items: center;
-  min-width: 140px;
-  min-height: 56px;
-  padding: 8px 12px;
+  min-width: 190px;
+  min-height: 60px;
+  padding: 8px 12px 8px 8px;
   text-align: left;
 }
 
@@ -228,22 +229,24 @@ button.icon {
   color: var(--danger);
 }
 
-.swatch {
+.build-icon {
   grid-row: span 2;
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  background: var(--tower);
+  width: 40px;
+  height: 40px;
 }
 
 .build-name {
   font-weight: 650;
 }
 
-.build-cost {
+.build-meta {
   grid-column: 2;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.build-cost {
   font-variant-numeric: tabular-nums;
 }
 
@@ -266,10 +269,17 @@ kbd {
 .panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
 }
 
 .panel-head h2 {
+  flex: 1;
   margin: 0;
   font-size: 1rem;
 }
@@ -322,9 +332,11 @@ kbd {
 }
 
 .card {
-  width: min(460px, 100%);
+  width: min(620px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
   display: grid;
-  gap: 12px;
+  gap: 14px;
   padding: 28px;
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -343,14 +355,146 @@ kbd {
   font-size: 1.05rem;
 }
 
-.rules {
+.lead {
+  line-height: 1.45;
+}
+
+.intro {
+  display: grid;
+  gap: 16px;
+}
+
+.steps {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 20px;
   display: grid;
   gap: 6px;
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.45;
+}
+
+.steps strong {
+  color: var(--text);
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.legend h2 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.legend-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.legend-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.legend-text {
+  display: grid;
+  font-size: 0.86rem;
+  line-height: 1.3;
+}
+
+.legend-text span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.chip {
+  position: absolute;
+  margin: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(16, 22, 30, 0.9);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.wave-preview {
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 14px;
+}
+
+.chip-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.preview-list {
+  display: flex;
+  gap: 10px;
+}
+
+.preview-entry {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.hint {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+
+.stat dt::before {
+  margin-right: 5px;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+
+.stat-lives dt::before {
+  content: "♥";
+  color: var(--danger);
+}
+
+.stat-gold dt::before {
+  content: "●";
+  color: #facc15;
+}
+
+.stat-wave dt::before {
+  content: "≋";
+  color: #fb7185;
 }
 
 .keys,
@@ -398,12 +542,32 @@ kbd {
   }
 
   .build-card {
-    min-width: 118px;
+    min-width: 124px;
   }
 
   kbd,
-  .keys {
+  .keys,
+  .build-role,
+  .preview-name {
     display: none;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  .legend {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .legend-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .legend-icon {
+    width: 36px;
+    height: 36px;
   }
 }
 

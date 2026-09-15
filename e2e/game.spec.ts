@@ -57,12 +57,43 @@ test("start screen explains the game and play starts it", async ({ page }) => {
     "https://github.com/celilcecen/towerdefence",
   );
 
+  const towers = dialog.getByRole("region", { name: "Your towers" }).getByRole("listitem");
+  const enemies = dialog.getByRole("region", { name: "Enemies" }).getByRole("listitem");
+  await expect(towers).toHaveCount(4);
+  await expect(towers.first()).toContainText("Rapid fire");
+  await expect(enemies).toHaveCount(4);
+  await expect(enemies.last()).toContainText("Boss");
+
   await page.getByRole("button", { name: "Play" }).click();
 
   await expect(dialog).toBeHidden();
   await expect(stat(page, "gold")).toHaveText("200");
   await expect(stat(page, "lives")).toHaveText("20");
   await expect(stat(page, "wave")).toHaveText("0/15");
+  await expect(page.locator("#wave-preview")).toContainText("8 Grunt");
+  await expect(page.locator("#hint")).toContainText("Pick a tower");
+});
+
+test("towers, enemies and the board are drawn, not left blank", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Play" }).click();
+
+  const inkedPixels = (selector: string): Promise<number> =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((canvas: HTMLCanvasElement) => {
+        const ctx = canvas.getContext("2d");
+        if (!ctx || canvas.width === 0) return 0;
+        const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let inked = 0;
+        for (let i = 3; i < data.length; i += 4) if ((data[i] ?? 0) > 0) inked++;
+        return inked;
+      });
+
+  expect(await inkedPixels(".build-icon")).toBeGreaterThan(200);
+  await expect.poll(() => inkedPixels(".preview-icon")).toBeGreaterThan(50);
+  await expect.poll(() => inkedPixels("#board")).toBeGreaterThan(10_000);
 });
 
 test("building a tower and fighting a wave earns gold", async ({ page }) => {

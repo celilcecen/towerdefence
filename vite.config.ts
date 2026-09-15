@@ -15,14 +15,18 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      // Everything with logic is unit-tested. DOM and canvas adapters (ui, input,
-      // renderer) are covered by the Playwright suite instead.
+      // Everything with logic is unit-tested. Drawing code and DOM adapters (art,
+      // renderer, effects, ui bindings, input) are covered by the Playwright suite instead.
       include: [
         "src/core/**/*.ts",
         "src/content/**/*.ts",
         "src/app/**/*.ts",
         "src/platform/**/*.ts",
         "src/render/layout.ts",
+        "src/render/color.ts",
+        "src/render/motion.ts",
+        "src/render/sprite-cache.ts",
+        "src/ui/describe.ts",
       ],
       exclude: ["src/app/main.ts"],
       reporter: ["text", "html", "lcov"],

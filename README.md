@@ -19,8 +19,9 @@ three upgrade levels and four targeting strategies. Works with mouse, keyboard a
 |                      |                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | Runtime dependencies | **0**. TypeScript, Canvas 2D and the DOM only                                      |
-| Unit tests           | **125**, with **99% statement / 96% branch** coverage of all game logic            |
-| End-to-end tests     | **12**. Playwright on desktop and mobile Chromium, under the production CSP        |
+| Unit tests           | **142**, with **99% statement / 96% branch** coverage of all game logic            |
+| End-to-end tests     | **14**. Playwright on desktop and mobile Chromium, under the production CSP        |
+| Art assets           | **0 files**. Every tower, enemy and effect is drawn in code and cached as a sprite |
 | Balance guardrails   | Headless bots play the full campaign on 8 seeds in CI                              |
 | Static analysis      | `strictTypeChecked` ESLint, strictest TypeScript flags, CodeQL `security-extended` |
 | Delivery             | GitHub Actions pinned to commit SHAs, atomic releases with instant rollback        |
@@ -66,8 +67,13 @@ the core.
 3. [`Simulation.step()`](src/core/simulation.ts) runs five systems in a fixed order: spawn →
    move → towers → projectiles → resolution.
 4. The renderer draws a read-only `WorldView`, interpolating between ticks for smooth motion.
-5. Systems publish typed events (`enemyKilled`, `waveCleared`, …); visual effects and UI
-   subscribe without the core knowing they exist.
+   Procedural [artwork](src/render/art) is painted once per cell size into a
+   [`SpriteCache`](src/render/sprite-cache.ts), so a frame is mostly `drawImage` calls; the
+   terrain is a single cached layer.
+5. Systems publish typed events (`enemyKilled`, `waveCleared`, …); visual effects, turret aim
+   and UI subscribe without the core knowing they exist. Presentation wording (tower roles,
+   enemy traits, the next-wave preview) is [derived from content data](src/ui/describe.ts), so
+   new content explains itself.
 
 A seed plus the command log reproduces a game exactly, which the test suite verifies
 tick for tick with a state hash.
@@ -90,13 +96,13 @@ tick for tick with a state hash.
 
 ## Testing strategy
 
-| Layer       | What it proves                                                                                                                                                                         | Where                                            |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Unit        | Grid parsing, flow field, damage and armor, slows, every targeting strategy, every command and rejection reason, content validation, session rules, loop timing, storage failure modes | [`tests/`](tests)                                |
-| Determinism | Same seed and commands give identical state every tick; replays equal live play                                                                                                        | [`simulation.test.ts`](tests/simulation.test.ts) |
-| Balance     | Doing nothing loses fast, towers without a maze never win, a planned maze wins while still losing lives                                                                                | [`balance.test.ts`](tests/balance.test.ts)       |
-| End-to-end  | Real build, real headers, desktop and mobile: play, build, fight, upgrade, sell, shortcuts; fails on any console error or CSP violation                                                | [`e2e/`](e2e)                                    |
-| Deployment  | nginx sends exactly the headers the e2e suite ran under; HTML contains nothing the CSP would block                                                                                     | [`deploy.test.ts`](tests/deploy.test.ts)         |
+| Layer       | What it proves                                                                                                                                                                                                                           | Where                                            |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Unit        | Grid parsing, flow field, damage and armor, slows, every targeting strategy, every command and rejection reason, content validation, session rules, loop timing, storage failure modes, sprite caching, turret aim, derived descriptions | [`tests/`](tests)                                |
+| Determinism | Same seed and commands give identical state every tick; replays equal live play                                                                                                                                                          | [`simulation.test.ts`](tests/simulation.test.ts) |
+| Balance     | Doing nothing loses fast, towers without a maze never win, a planned maze wins while still losing lives                                                                                                                                  | [`balance.test.ts`](tests/balance.test.ts)       |
+| End-to-end  | Real build, real headers, desktop and mobile: play, build, fight, upgrade, sell, shortcuts, visual legend, canvases actually painted; fails on any console error or CSP violation                                                        | [`e2e/`](e2e)                                    |
+| Deployment  | nginx sends exactly the headers the e2e suite ran under; HTML contains nothing the CSP would block                                                                                                                                       | [`deploy.test.ts`](tests/deploy.test.ts)         |
 
 ```text
 $ npm run balance

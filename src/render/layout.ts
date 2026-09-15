@@ -54,6 +54,11 @@ export function toScreen(layout: BoardLayout, x: number, y: number): Point {
     : { x: offsetX + x * cellSize, y: offsetY + y * cellSize };
 }
 
+/** A world-space angle (0 faces +x) as seen on screen. */
+export function screenAngle(layout: BoardLayout, angle: number): number {
+  return layout.rotated ? angle + Math.PI / 2 : angle;
+}
+
 /** Maps a point in CSS pixels, relative to the canvas, to a board cell. */
 export function pointToCell(layout: BoardLayout, px: number, py: number): Cell | undefined {
   const { cellSize, offsetX, offsetY, columns, rows, rotated } = layout;

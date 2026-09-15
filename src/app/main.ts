@@ -4,7 +4,9 @@ import { ContentRegistry } from "../core/content-registry";
 import { bindControls } from "../input/controls";
 import { browserStorage, LocalRecordStore } from "../platform/local-record-store";
 import { Effects } from "../render/effects";
+import { TurretAim } from "../render/motion";
 import { CanvasRenderer } from "../render/renderer";
+import { canvasSurface } from "../render/surface";
 import { requireElement } from "../ui/dom";
 import { GameUi } from "../ui/game-ui";
 import { GameLoop } from "./game-loop";
@@ -15,6 +17,7 @@ function main(): void {
   const canvas = requireElement(document, "#board", HTMLCanvasElement);
   const stage = requireElement(document, "#stage", HTMLElement);
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const clock = (): number => performance.now();
 
   const content = new ContentRegistry(GAME_CONTENT);
   const session = new GameSession(
@@ -23,16 +26,26 @@ function main(): void {
     () => crypto.getRandomValues(new Uint32Array(1))[0] ?? 1,
   );
 
-  const renderer = new CanvasRenderer(canvas);
-  const effects = new Effects(reducedMotion, () => performance.now());
-  let detachEffects = effects.attach(session.simulation.events);
-  session.events.on("restarted", ({ simulation }) => {
-    detachEffects();
+  const renderer = new CanvasRenderer(canvas, canvasSurface);
+  const effects = new Effects(reducedMotion, clock);
+  const aim = new TurretAim(clock);
+  const attachVisuals = (): (() => void) => {
+    const detachEffects = effects.attach(session.simulation.events);
+    const detachAim = aim.attach(session.simulation.events);
+    return () => {
+      detachEffects();
+      detachAim();
+    };
+  };
+  let detachVisuals = attachVisuals();
+  session.events.on("restarted", () => {
+    detachVisuals();
     effects.clear();
-    detachEffects = effects.attach(simulation.events);
+    aim.clear();
+    detachVisuals = attachVisuals();
   });
 
-  const ui = new GameUi(document, session);
+  const ui = new GameUi(document, session, window.devicePixelRatio || 1);
 
   const fit = (): void => {
     const { grid } = session.simulation;
@@ -57,9 +70,10 @@ function main(): void {
         selection: session.selection,
         hover: session.hover,
         alpha,
-        now: performance.now(),
+        now: clock(),
         effects,
-        animatePath: !reducedMotion,
+        aim,
+        reducedMotion,
       });
       ui.render();
     },

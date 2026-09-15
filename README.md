@@ -7,7 +7,18 @@ A maze-building tower defense game for the browser.
 
 **▶ Play it: [play.yctechnologies.com.tr](https://play.yctechnologies.com.tr)**
 
-![Gridlock gameplay](docs/screenshot.png)
+![Gridlock gameplay: towers firing at a wave of grunts on the way to the crystal](docs/screenshot.png)
+
+<table>
+  <tr>
+    <td width="68%"><img src="docs/start-screen.png" alt="Start screen with how-to-play steps and a visual legend of towers and enemies" /></td>
+    <td width="32%"><img src="docs/mobile.png" alt="Phone layout: the board rotates so the route runs top to bottom" /></td>
+  </tr>
+  <tr>
+    <td align="center">Start screen: rules and a visual legend drawn by the game's own renderer</td>
+    <td align="center">On phones the board rotates for bigger tap targets</td>
+  </tr>
+</table>
 
 Your towers are the walls. Enemies always take the shortest open route to the exit, so every
 tower you place reshapes the maze they have to walk. You can never seal the path completely;

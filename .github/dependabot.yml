@@ -5,7 +5,10 @@ updates:
     schedule:
       interval: weekly
     groups:
-      # Safe updates arrive together; major versions get their own PR so one
+      # Packages that must move in lockstep, including across major versions.
+      vitest:
+        patterns: ["vitest", "@vitest/*"]
+      # Safe updates arrive together; other majors get their own PR so one
       # breaking upgrade never blocks the rest.
       dev-dependencies:
         dependency-type: development

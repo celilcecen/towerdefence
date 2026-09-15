@@ -5,8 +5,17 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # Safe updates arrive together; major versions get their own PR so one
+      # breaking upgrade never blocks the rest.
       dev-dependencies:
         dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # typescript-eslint declares a TypeScript peer range (TS 7 broke `npm ci`
+      # in PR #1). Take TypeScript majors together with a typescript-eslint
+      # release that supports them.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

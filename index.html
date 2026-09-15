@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0a0e13" />
+    <meta
+      name="description"
+      content="Gridlock is a maze-building tower defense game. Place towers to shape the enemy's path and hold 15 waves."
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Gridlock · Tower Defense</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hud">
+        <div class="brand" aria-label="Gridlock">GRIDLOCK</div>
+        <dl class="stats">
+          <div class="stat">
+            <dt>Lives</dt>
+            <dd id="lives">0</dd>
+          </div>
+          <div class="stat">
+            <dt>Gold</dt>
+            <dd id="gold">0</dd>
+          </div>
+          <div class="stat">
+            <dt>Wave</dt>
+            <dd id="wave">0</dd>
+          </div>
+        </dl>
+        <div class="controls">
+          <button id="pause" class="ghost" type="button" aria-pressed="false" aria-keyshortcuts="P">
+            Pause
+          </button>
+          <button
+            id="speed"
+            class="ghost"
+            type="button"
+            aria-label="Game speed"
+            aria-keyshortcuts="F"
+          >
+            1×
+          </button>
+          <button id="next-wave" class="primary" type="button" aria-keyshortcuts="Space" disabled>
+            Start wave 1
+          </button>
+        </div>
+      </header>
+
+      <main id="stage" class="stage">
+        <canvas
+          id="board"
+          aria-label="Game board. Select a tower, then click a cell to build."
+        ></canvas>
+        <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+      </main>
+
+      <footer class="dock">
+        <div id="build-dock" class="build-dock" role="toolbar" aria-label="Build towers"></div>
+        <section id="tower-panel" class="tower-panel" aria-label="Selected tower" hidden>
+          <div class="panel-head">
+            <h2 id="panel-title"></h2>
+            <button id="panel-close" class="icon" type="button" aria-label="Close tower panel">
+              ×
+            </button>
+          </div>
+          <p id="panel-stats" class="panel-stats"></p>
+          <p id="panel-next" class="panel-next"></p>
+          <div id="targeting" class="segments" role="group" aria-label="Targeting"></div>
+          <div class="panel-actions">
+            <button id="upgrade" class="primary" type="button" aria-keyshortcuts="U">
+              Upgrade
+            </button>
+            <button id="sell" class="ghost" type="button" aria-keyshortcuts="S">Sell</button>
+          </div>
+        </section>
+      </footer>
+
+      <div id="overlay" class="overlay">
+        <div class="card" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
+          <h1 id="overlay-title">Gridlock</h1>
+          <p id="overlay-text" class="lead">Build the maze. Hold the line for 15 waves.</p>
+          <ul class="rules">
+            <li>Towers are walls. Enemies always take the shortest open route, so shape it.</li>
+            <li>You can never seal the path completely. The game won't let you.</li>
+            <li>Start each wave when you're ready. Upgrade, retarget or sell between shots.</li>
+          </ul>
+          <p class="keys">
+            1–4 build · Space next wave · U upgrade · S sell · P pause · F speed · Esc cancel
+          </p>
+          <p id="overlay-record" class="record"></p>
+          <button id="play" class="primary large" type="button">Play</button>
+          <a id="repo-link" class="repo" target="_blank" rel="noopener noreferrer"
+            >How it's built · source on GitHub</a
+          >
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>

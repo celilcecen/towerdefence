@@ -1,0 +1,40 @@
+{
+  "name": "gridlock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A maze-building tower defense game for the browser, built on a deterministic, fully tested simulation core.",
+  "license": "MIT",
+  "author": "Celil Çeçen",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.core.json",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "balance": "vitest run tests/balance.test.ts",
+    "e2e": "playwright test",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run e2e"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.5.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11"
+  }
+}

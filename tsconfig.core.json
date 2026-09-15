@@ -1,0 +1,11 @@
+{
+  // Architectural fitness function: the simulation core and game content are
+  // compiled WITHOUT the DOM library. Any accidental use of window, document,
+  // localStorage or timers inside them is a compile error, not a code-review note.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/core", "src/content"]
+}

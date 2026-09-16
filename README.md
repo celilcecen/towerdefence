@@ -3,41 +3,46 @@
 [![CI](https://github.com/celilcecen/towerdefence/actions/workflows/ci.yml/badge.svg)](https://github.com/celilcecen/towerdefence/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/celilcecen/towerdefence/actions/workflows/codeql.yml/badge.svg)](https://github.com/celilcecen/towerdefence/actions/workflows/codeql.yml)
 
-A maze-building tower defense game for the browser.
+A maze-building tower defense game with a hero on the field, for the browser and for phones.
 
 **▶ Play it: [play.yctechnologies.com.tr](https://play.yctechnologies.com.tr)**
 
-![Gridlock gameplay: towers firing at a wave of grunts on the way to the crystal](docs/screenshot.png)
+![Gridlock gameplay: the Sentinel fighting a wave of grunts in the Cinder Fields while towers line the lane](docs/screenshot.png)
 
 <table>
   <tr>
-    <td width="68%"><img src="docs/start-screen.png" alt="Start screen with how-to-play steps and a visual legend of towers and enemies" /></td>
-    <td width="32%"><img src="docs/mobile.png" alt="Phone layout: the board rotates so the route runs top to bottom" /></td>
+    <td width="68%"><img src="docs/start-screen.png" alt="Home screen: continue the campaign, the campaign map, classic mode, help and settings" /></td>
+    <td width="32%"><img src="docs/mobile.png" alt="Phone layout: the board rotates and the Sentinel is steered from a virtual stick with Dash and Nova buttons" /></td>
   </tr>
   <tr>
-    <td align="center">Start screen: rules and a visual legend drawn by the game's own renderer</td>
-    <td align="center">On phones the board rotates for bigger tap targets</td>
+    <td align="center">Home screen: a story campaign across four regions, plus the original Classic mode</td>
+    <td align="center">On phones the board rotates; the Sentinel is steered from a virtual stick</td>
   </tr>
 </table>
 
 Your towers are the walls. Enemies always take the shortest open route to the exit, so every
 tower you place reshapes the maze they have to walk. You can never seal the path completely;
-the game checks every placement before accepting it. Hold 15 waves across four tower types,
-three upgrade levels and four targeting strategies. And you are on the field too: the Sentinel
-runs the maze you build, fires at anything in reach, dashes through gaps and unleashes a crystal
-Nova when charged. Works with mouse, keyboard and touch (a virtual stick on phones).
+the game checks every placement before accepting it. A 12-level story campaign crosses four
+regions with six tower types, ten kinds of monster (flyers, healers, splitters, two bosses),
+three upgrade levels, four targeting strategies and two powers to aim by hand; Classic mode
+keeps the original 15 waves. And you are on the field too: the Sentinel runs the maze you
+build, fires at anything in reach, dashes through gaps and unleashes a crystal Nova when
+charged. Works with mouse, keyboard and touch (a virtual stick on phones), in English and
+Turkish, and ships as native Android and iOS shells.
 
 ## At a glance
 
-|                      |                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| Runtime dependencies | **0**. TypeScript, Canvas 2D and the DOM only                                      |
-| Unit tests           | **277**, with **99% statement / 96% branch** coverage of all game logic            |
-| End-to-end tests     | **26**. Playwright on desktop and mobile Chromium, under the production CSP        |
-| Art assets           | **0 files**. Every tower, enemy and effect is drawn in code and cached as a sprite |
-| Balance guardrails   | Headless bots play the full campaign on 8 seeds in CI                              |
-| Static analysis      | `strictTypeChecked` ESLint, strictest TypeScript flags, CodeQL `security-extended` |
-| Delivery             | GitHub Actions pinned to commit SHAs, atomic releases with instant rollback        |
+|                      |                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| Runtime dependencies | **0** on the web. TypeScript, Canvas 2D, Web Audio and the DOM only                     |
+| Unit tests           | **277**, with **99% statement / 96% branch** coverage of all game logic                 |
+| End-to-end tests     | **26**. Playwright on desktop and mobile Chromium, under the production CSP             |
+| Art and sound assets | **0 files**. Every tower, enemy, hero, effect and sound is generated in code            |
+| Balance guardrails   | Headless bots play all 12 levels and Classic on several seeds in CI                     |
+| Platforms            | Web (static, offline-capable), Android and iOS through [Capacitor](capacitor.config.ts) |
+| Languages            | English and Turkish, every string in [`src/i18n`](src/i18n)                             |
+| Static analysis      | `strictTypeChecked` ESLint, strictest TypeScript flags, CodeQL `security-extended`      |
+| Delivery             | GitHub Actions pinned to commit SHAs, atomic releases with instant rollback             |
 
 ## Architecture
 
@@ -51,15 +56,17 @@ flowchart LR
     UI["ui/<br/>DOM chrome"]
     Input["input/<br/>pointer + keyboard"]
     Render["render/<br/>Canvas 2D"]
-    Platform["platform/<br/>localStorage"]
+    Audio["audio/<br/>Web Audio synth"]
+    Platform["platform/<br/>storage + native bridge"]
   end
-  App["app/<br/>session + fixed-step loop"]
+  App["app/<br/>session, coach, fixed-step loop"]
   Core["core/<br/>deterministic simulation"]
-  Content["content/<br/>towers, enemies, waves, map"]
+  Content["content/<br/>campaign, story, towers, enemies, heroes, powers"]
 
   UI --> App
   Input --> App
   Render --> Core
+  Audio --> Core
   App --> Core
   Platform -. implements RecordStore port .-> Core
   Content --> Core
@@ -80,15 +87,19 @@ the core.
    `heroDash`, `heroNova`), validated at runtime. Even the hero's stick input is a command, so
    a replay log reproduces a whole game, hero and all.
 3. [`Simulation.step()`](src/core/simulation.ts) runs its systems in a fixed order: spawn →
-   move → abilities → hero → towers → projectiles → resolution.
+   move → abilities → hero → towers → projectiles → power cooldown → resolution.
 4. The renderer draws a read-only `WorldView`, interpolating between ticks for smooth motion.
    Procedural [artwork](src/render/art) is painted once per cell size into a
    [`SpriteCache`](src/render/sprite-cache.ts), so a frame is mostly `drawImage` calls; the
    terrain is a single cached layer.
-5. Systems publish typed events (`enemyKilled`, `waveCleared`, …); visual effects, turret aim
-   and UI subscribe without the core knowing they exist. Presentation wording (tower roles,
-   enemy traits, the next-wave preview) is [derived from content data](src/ui/describe.ts), so
-   new content explains itself.
+5. Systems publish typed events (`enemyKilled`, `waveCleared`, `heroNova`, …); visual
+   effects, turret aim, sound cues, haptics and UI subscribe without the core knowing they
+   exist. Presentation wording (tower roles, enemy traits, the next-wave preview) is
+   [derived from content data](src/ui/describe.ts), so new content explains itself.
+6. The [hero](src/core/systems/hero.ts) is ordinary simulation state driven by the same
+   commands as everything else. What makes it _look_ alive (a rippling cloak, recoil, dash
+   streaks, the Nova wash) lives entirely in [`src/render`](src/render/art/hero.ts) and reacts
+   to events.
 
 A seed plus the command log reproduces a game exactly, which the test suite verifies
 tick for tick with a state hash.
@@ -108,16 +119,18 @@ tick for tick with a state hash.
 - [ADR 0001: Deterministic, fixed-timestep simulation core](docs/adr/0001-deterministic-fixed-timestep-simulation.md)
 - [ADR 0002: Flow-field pathfinding instead of per-enemy A*](docs/adr/0002-flow-field-pathfinding.md)
 - [ADR 0003: Content as validated data, guarded by balance bots](docs/adr/0003-content-as-data-and-balance-bots.md)
+- [ADR 0004: The hero is a layer inside the deterministic core](docs/adr/0004-hero-as-a-layer-inside-the-core.md)
+  (see also the [Sentinel design note](docs/designs/sentinel-hero-layer.md))
 
 ## Testing strategy
 
-| Layer       | What it proves                                                                                                                                                                                                                           | Where                                            |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Unit        | Grid parsing, flow field, damage and armor, slows, every targeting strategy, every command and rejection reason, content validation, session rules, loop timing, storage failure modes, sprite caching, turret aim, derived descriptions | [`tests/`](tests)                                |
-| Determinism | Same seed and commands give identical state every tick; replays equal live play                                                                                                                                                          | [`simulation.test.ts`](tests/simulation.test.ts) |
-| Balance     | Doing nothing loses fast, towers without a maze never win, a planned maze wins while still losing lives                                                                                                                                  | [`balance.test.ts`](tests/balance.test.ts)       |
-| End-to-end  | Real build, real headers, desktop and mobile: play, build, fight, upgrade, sell, shortcuts, visual legend, canvases actually painted; fails on any console error or CSP violation                                                        | [`e2e/`](e2e)                                    |
-| Deployment  | nginx sends exactly the headers the e2e suite ran under; HTML contains nothing the CSP would block                                                                                                                                       | [`deploy.test.ts`](tests/deploy.test.ts)         |
+| Layer       | What it proves                                                                                                                                                                                                                                                                                                                                                                                                               | Where                                                                                                    |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Unit        | Grid parsing, flow field, damage and armor, slows, every targeting strategy, every command and rejection reason, content and campaign validation, the hero (movement, wall sliding, eviction, fire, charge, dash, Nova, down and respawn), session rules, the onboarding coach, sound cues and limiter, translations, loop timing, storage failure modes, sprite caching, turret aim, effect timelines, derived descriptions | [`tests/`](tests)                                                                                        |
+| Determinism | Same seed and commands give identical state every tick, hero included; replays equal live play                                                                                                                                                                                                                                                                                                                               | [`simulation.test.ts`](tests/simulation.test.ts), [`hero.test.ts`](tests/hero.test.ts)                   |
+| Balance     | Doing nothing loses fast, towers without a maze never win, a planned maze wins every level while still losing lives; the bots never use the hero, so no level depends on it                                                                                                                                                                                                                                                  | [`balance.test.ts`](tests/balance.test.ts), [`campaign-balance.test.ts`](tests/campaign-balance.test.ts) |
+| End-to-end  | Real build, real headers, desktop and mobile: tutorial, campaign briefing and locks, classic mode, language switch, build, fight, upgrade, sell, shortcuts, steering the Sentinel from stick and keyboard, canvases actually painted; fails on any console error or CSP violation                                                                                                                                            | [`e2e/`](e2e)                                                                                            |
+| Deployment  | nginx sends exactly the headers the e2e suite ran under; HTML contains nothing the CSP would block                                                                                                                                                                                                                                                                                                                           | [`deploy.test.ts`](tests/deploy.test.ts)                                                                 |
 
 ```text
 $ npm run balance
@@ -125,8 +138,17 @@ $ npm run balance
 Balance report (8 seeds)
 idle   wins 0/8   avg wave  2.0   avg lives left  0.0
 wall   wins 0/8   avg wave  4.4   avg lives left  0.0
-maze   wins 8/8   avg wave 15.0   avg lives left  8.4
+maze   wins 8/8   avg wave 15.0   avg lives left  9.8
+Campaign balance (6 seeds, 8+ waves per level)
+c1-crossing  idle 0/6 w3.0 ♥0.0    hug 6/6 w8.0 ♥20.0    maze 6/6 w8.0 ♥20.0
+c2-gate      idle 0/6 w2.0 ♥0.0    hug 0/6 w9.8 ♥0.0     maze 6/6 w14.0 ♥14.0
+c3-keep      idle 0/6 w2.0 ♥0.0    hug 2/6 w15.0 ♥6.3    maze 5/6 w15.0 ♥13.0
+c4-heart     idle 0/6 w2.0 ♥0.0    hug 0/6 w8.2 ♥0.0     maze 6/6 w18.0 ♥13.0
+maze lives by chapter: greenreach ♥20.0  frostmarch ♥18.0  ashlands ♥12.3  rift ♥11.5
 ```
+
+The difficulty curve is visible in the last line: the maze bot keeps fewer lives in each
+later chapter. The full table lists all 12 levels.
 
 ## Security
 
@@ -150,6 +172,23 @@ npm run verify     # format, lint, types, unit tests with coverage, build, e2e
 | `npm run test:coverage` | Unit, determinism, balance and deployment tests with coverage thresholds                     |
 | `npm run e2e`           | Playwright against the production build and headers (`npx playwright install chromium` once) |
 | `npm run balance`       | Prints the bot outcome table after changing content                                          |
+| `npm run assets:readme` | Retakes the three README pictures from the running game                                      |
+| `npm run assets:app`    | Renders the app icon and splash screens for both native shells                               |
+| `npm run assets:store`  | Captures store screenshots and the feature graphic in every language                         |
+
+## Mobile
+
+The same build runs inside [Capacitor](capacitor.config.ts) shells for Android and iOS
+(`android/`, `ios/`, app id `tr.com.yctechnologies.gridlock`). The web bundle is packaged
+into the app, so it plays fully offline. The native layer only adds what the web cannot do
+well: haptics on dashes, Novas and hits, a dark status bar and a splash that hides once the
+game has painted. On phones the board rotates so the route runs top to bottom, the Sentinel
+is steered from a fixed virtual stick, and Dash and Nova sit under the right thumb.
+
+```bash
+npm run build && npx cap sync   # copy the web build into both shells
+npx cap open android            # Android Studio; iOS needs Xcode on a Mac
+```
 
 ## Deployment
 

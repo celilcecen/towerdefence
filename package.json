@@ -24,7 +24,8 @@
     "e2e": "playwright test",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run e2e",
     "assets:app": "node scripts/generate-app-assets.mjs",
-    "assets:store": "node scripts/store-screenshots.mjs"
+    "assets:store": "node scripts/store-screenshots.mjs",
+    "assets:readme": "node scripts/readme-screenshots.mjs"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",

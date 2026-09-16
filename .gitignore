@@ -9,3 +9,8 @@ blob-report/
 !.env.example
 *.log
 .DS_Store
+*.jks
+*.keystore
+keystore.properties
+store/screenshots/
+store/feature-graphic.jpg

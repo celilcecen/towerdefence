@@ -7,7 +7,11 @@ export function damageAfterArmor(raw: number, armor: number, minDamageRatio: num
   return Math.max(raw * minDamageRatio, raw - armor);
 }
 
-export function applyDamage(ctx: TickContext, enemy: EnemyState, raw: number): void {
+export function applyDamage(
+  ctx: Pick<TickContext, "content" | "events">,
+  enemy: EnemyState,
+  raw: number,
+): void {
   if (enemy.status !== "alive") return;
   const dealt = damageAfterArmor(raw, enemy.def.armor, ctx.content.rules.minDamageRatio);
   enemy.hp = Math.max(0, enemy.hp - dealt);

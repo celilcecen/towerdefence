@@ -35,15 +35,38 @@ class Fnv1a {
  */
 export function hashWorld(world: WorldView): number {
   const h = new Fnv1a();
-  h.add(world.tick, world.gold, world.lives, PHASES.indexOf(world.phase), world.wavesStarted);
+  h.add(
+    world.tick,
+    world.gold,
+    world.lives,
+    PHASES.indexOf(world.phase),
+    world.wavesStarted,
+    world.wavesCleared,
+  );
   for (const e of world.enemies) {
-    h.add(e.id, e.hp, e.x, e.y, e.waypoint.x, e.waypoint.y, e.slowFactor, e.slowTimer);
+    h.add(
+      e.id,
+      e.hp,
+      e.x,
+      e.y,
+      e.waypoint.x,
+      e.waypoint.y,
+      e.slowFactor,
+      e.slowTimer,
+      e.abilityTimer,
+    );
   }
   for (const t of world.towers) {
     h.add(t.id, t.x, t.y, t.level, t.cooldown, TARGETING_MODES.indexOf(t.targeting), t.invested);
   }
   for (const p of world.projectiles) {
     h.add(p.id, p.x, p.y, p.aimX, p.aimY);
+  }
+  for (const power of world.powers) {
+    h.add(power.cooldown);
+  }
+  for (const cursor of world.spawnQueue) {
+    h.add(cursor.spawned, cursor.timer);
   }
   return h.value;
 }

@@ -5,9 +5,10 @@ import type { Grid } from "../core/grid";
 import type { Simulation } from "../core/simulation";
 import type { EnemyState, TowerState } from "../core/state";
 import { currentLevel, towerCenter } from "../core/state";
-import { circle, TAU } from "./art/common";
-import { enemyArt, paintFeet } from "./art/enemies";
-import { paintDart, paintShell } from "./art/projectiles";
+import { circle, radial, TAU } from "./art/common";
+import { enemyArt, FLAP_FRAMES, paintFeet } from "./art/enemies";
+import { paintDart, paintMortarShell, paintShell } from "./art/projectiles";
+import type { TerrainTheme } from "./art/terrain";
 import {
   paintCore,
   paintExitTile,
@@ -15,10 +16,16 @@ import {
   paintPortal,
   paintRock,
   paintSpawnTile,
+  terrainTheme,
 } from "./art/terrain";
 import { towerArt, TURRET_SCALE } from "./art/towers";
+import type { ScreenRect } from "./atmosphere";
+import { paintAtmosphere, paintEdgeGlow, paintVignette } from "./atmosphere";
+import type { Region } from "./clusters";
+import { clusterRegions } from "./clusters";
 import { withAlpha } from "./color";
 import type { Effects } from "./effects";
+import { buildPop, DEATH_MS } from "./effects";
 import type { BoardLayout } from "./layout";
 import { computeLayout, pointToCell, screenAngle, toScreen } from "./layout";
 import type { TurretAim } from "./motion";
@@ -37,32 +44,39 @@ export interface RenderFrame {
   readonly effects: Effects;
   readonly aim: TurretAim;
   readonly reducedMotion: boolean;
+  /** The chapter's visual theme id ("meadow", "frost", "ash", "rift"). Defaults to "meadow". */
+  readonly theme?: string;
+  /** Tutorial cells to call out; the first also gets a bouncing pointer. */
+  readonly guide?: readonly Cell[] | undefined;
+  /**
+   * Forces the low-lives warning on or off. By default it shows while lives
+   * are at or below a quarter of the level's starting lives.
+   */
+  readonly lowLives?: boolean | undefined;
 }
 
-interface Region {
-  readonly x: number;
-  readonly y: number;
-  readonly halfWidth: number;
-  readonly halfHeight: number;
+/** A rectangle in viewport (client) coordinates, as for positioning DOM overlays. */
+export interface ClientRect {
+  readonly left: number;
+  readonly top: number;
+  readonly width: number;
+  readonly height: number;
 }
+
+/** Milliseconds for one wingbeat or flame flicker of a flying enemy. */
+const FLAP_MS = 560;
+/** Milliseconds for one up-and-down bob of a flying enemy. */
+const BOB_MS = 1500;
+const GUIDE_COLOR = "#fde047";
+const DANGER_COLOR = "#ef4444";
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
-/** Centre and half extents, in cells, of the box around a group of cells. */
-function regionOf(cells: readonly Cell[]): Region | undefined {
-  if (cells.length === 0) return undefined;
-  const xs = cells.map((c) => c.x);
-  const ys = cells.map((c) => c.y);
-  const minX = Math.min(...xs);
-  const minY = Math.min(...ys);
-  const maxX = Math.max(...xs) + 1;
-  const maxY = Math.max(...ys) + 1;
-  return {
-    x: (minX + maxX) / 2,
-    y: (minY + maxY) / 2,
-    halfWidth: (maxX - minX) / 2,
-    halfHeight: (maxY - minY) / 2,
-  };
+interface Landmarks {
+  readonly grid: Grid;
+  readonly spawns: Region[];
+  readonly exits: Region[];
+  readonly rocks: Cell[];
 }
 
 /** Draws a read-only view of the world. Holds no game state of its own. */
@@ -73,8 +87,12 @@ export class CanvasRenderer {
   private cssWidth = 1;
   private cssHeight = 1;
   private pixelRatio = 1;
-  /** Terrain never changes during a game, so it is painted once per size. */
-  private terrain: { readonly grid: Grid; readonly image: CanvasImageSource } | undefined;
+  /** Terrain never changes during a game, so it is painted once per size, map and theme. */
+  private terrain:
+    | { readonly grid: Grid; readonly theme: TerrainTheme; readonly image: CanvasImageSource }
+    | undefined;
+  /** One rift per group of spawn cells, one crystal per group of exit cells, and the rocks. */
+  private landmarks: Landmarks | undefined;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -108,27 +126,88 @@ export class CanvasRenderer {
     return pointToCell(this.layout, clientX - rect.left, clientY - rect.top);
   }
 
+  /** A board cell's rectangle in viewport coordinates, correct when the board is rotated. */
+  cellClientRect(x: number, y: number): ClientRect {
+    const origin = this.cellOrigin(x, y);
+    const size = this.layout.cellSize;
+    return this.toClient({ x: origin.x, y: origin.y, width: size, height: size });
+  }
+
+  /**
+   * Viewport rectangles around each rift (spawn group) and crystal gate (exit
+   * group). Empty until the first frame has been drawn.
+   */
+  landmarkClientRects(): {
+    readonly spawns: readonly ClientRect[];
+    readonly exits: readonly ClientRect[];
+  } {
+    const marks = this.landmarks;
+    if (!marks) return { spawns: [], exits: [] };
+    const box = (region: Region): ClientRect => {
+      const a = this.point(region.x - region.halfWidth, region.y - region.halfHeight);
+      const b = this.point(region.x + region.halfWidth, region.y + region.halfHeight);
+      return this.toClient({
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      });
+    };
+    return { spawns: marks.spawns.map(box), exits: marks.exits.map(box) };
+  }
+
   draw(frame: RenderFrame): void {
     // A collapsed stage (hidden tab, first layout pass) has nothing to draw into.
     if (this.canvas.width === 0 || this.canvas.height === 0) return;
     const { ctx } = this;
+    const theme = terrainTheme(frame.theme);
+    const size = this.layout.cellSize;
     ctx.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
-    ctx.fillStyle = PALETTE.background;
+    ctx.fillStyle = theme.background;
     ctx.fillRect(0, 0, this.cssWidth, this.cssHeight);
 
-    this.drawTerrain(frame.simulation.grid);
-    this.drawLandmarks(frame);
+    const { grid } = frame.simulation;
+    const marks = this.landmarksFor(grid);
+    const board = this.boardRect(grid);
+    const shake = frame.effects.shake(frame.now);
+    ctx.translate(shake.x * size, shake.y * size);
+
+    this.drawTerrain(grid, theme);
+    this.drawLandmarks(frame, marks);
     this.drawPath(frame);
     this.drawHover(frame);
     for (const tower of frame.simulation.world.towers) this.drawTower(tower, frame);
+    this.drawDying(frame);
     for (const enemy of frame.simulation.world.enemies) this.drawEnemy(enemy, frame);
     this.drawProjectiles(frame);
-    frame.effects.draw(ctx, (x, y) => this.point(x, y), this.layout.cellSize, frame.now);
+    if (!frame.reducedMotion) {
+      paintAtmosphere(ctx, theme.id, board, size, frame.now, marks.rocks, (x, y) =>
+        this.point(x + 0.5, y + 0.5),
+      );
+    }
+    this.drawFreeze(frame, board);
+    this.drawBossShadow(frame, board);
+    this.drawDanger(frame, board);
+    frame.effects.draw(ctx, (x, y) => this.point(x, y), size, frame.now, grid);
     this.drawSelection(frame);
+    this.drawGuide(frame);
   }
 
   private point(x: number, y: number): { x: number; y: number } {
     return toScreen(this.layout, x, y);
+  }
+
+  /** Canvas CSS pixels to viewport coordinates, allowing for CSS scaling of the canvas. */
+  private toClient(rect: ScreenRect): ClientRect {
+    const bounds = this.canvas.getBoundingClientRect();
+    const kx = this.cssWidth > 0 ? bounds.width / this.cssWidth : 1;
+    const ky = this.cssHeight > 0 ? bounds.height / this.cssHeight : 1;
+    return {
+      left: bounds.left + rect.x * kx,
+      top: bounds.top + rect.y * ky,
+      width: rect.width * kx,
+      height: rect.height * ky,
+    };
   }
 
   /** Top-left corner, in CSS pixels, of a cell. Correct whether or not the board is rotated. */
@@ -138,8 +217,38 @@ export class CanvasRenderer {
     return { x: center.x - half, y: center.y - half };
   }
 
-  private drawTerrain(grid: Grid): void {
-    if (this.terrain?.grid !== grid) {
+  /** Screen rectangle covering the whole board. */
+  private boardRect(grid: Grid): ScreenRect {
+    const a = this.point(0, 0);
+    const b = this.point(grid.width, grid.height);
+    return {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      width: Math.abs(b.x - a.x),
+      height: Math.abs(b.y - a.y),
+    };
+  }
+
+  private landmarksFor(grid: Grid): Landmarks {
+    if (this.landmarks?.grid !== grid) {
+      const rocks: Cell[] = [];
+      for (let y = 0; y < grid.height; y++) {
+        for (let x = 0; x < grid.width; x++) {
+          if (grid.terrainAt(x, y) === "rock") rocks.push({ x, y });
+        }
+      }
+      this.landmarks = {
+        grid,
+        spawns: clusterRegions(grid.spawns),
+        exits: clusterRegions(grid.exits),
+        rocks,
+      };
+    }
+    return this.landmarks;
+  }
+
+  private drawTerrain(grid: Grid, theme: TerrainTheme): void {
+    if (this.terrain?.grid !== grid || this.terrain.theme !== theme) {
       const { image, context } = this.createSurface(this.canvas.width, this.canvas.height);
       context.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
       const size = this.layout.cellSize;
@@ -148,38 +257,33 @@ export class CanvasRenderer {
           const { x: left, y: top } = this.cellOrigin(x, y);
           switch (grid.terrainAt(x, y)) {
             case "rock":
-              paintRock(context, x, y, left, top, size);
+              paintRock(context, theme, x, y, left, top, size);
               break;
             case "spawn":
-              paintSpawnTile(context, left, top, size);
+              paintSpawnTile(context, theme, left, top, size);
               break;
             case "exit":
-              paintExitTile(context, left, top, size);
+              paintExitTile(context, theme, left, top, size);
               break;
             case "open":
-              paintGround(context, x, y, left, top, size);
+              paintGround(context, theme, x, y, left, top, size);
               break;
           }
         }
       }
-      const a = this.point(0, 0);
-      const b = this.point(grid.width, grid.height);
+      const board = this.boardRect(grid);
+      paintVignette(context, board);
       context.strokeStyle = "rgba(255, 255, 255, 0.08)";
       context.lineWidth = 1;
-      context.strokeRect(
-        Math.min(a.x, b.x) + 0.5,
-        Math.min(a.y, b.y) + 0.5,
-        Math.abs(b.x - a.x) - 1,
-        Math.abs(b.y - a.y) - 1,
-      );
-      this.terrain = { grid, image };
+      context.strokeRect(board.x + 0.5, board.y + 0.5, board.width - 1, board.height - 1);
+      this.terrain = { grid, theme, image };
     }
     this.ctx.drawImage(this.terrain.image, 0, 0, this.cssWidth, this.cssHeight);
   }
 
-  /** The rift enemies come from and the crystal they are trying to reach. */
-  private drawLandmarks(frame: RenderFrame): void {
-    const { grid, world } = frame.simulation;
+  /** The rifts enemies come from and the crystals they are trying to reach. */
+  private drawLandmarks(frame: RenderFrame, marks: Landmarks): void {
+    const { ctx } = this;
     const size = this.layout.cellSize;
     const now = frame.reducedMotion ? 0 : frame.now;
     const screenRadii = (region: Region): { rx: number; ry: number } =>
@@ -187,17 +291,29 @@ export class CanvasRenderer {
         ? { rx: region.halfHeight * size, ry: region.halfWidth * size }
         : { rx: region.halfWidth * size, ry: region.halfHeight * size };
 
-    const spawn = regionOf(grid.spawns);
-    if (spawn) {
+    // A boss arriving makes every rift flare and swell.
+    const arrival = frame.effects.bossArrival(frame.now);
+    const surge = Math.max(frame.simulation.world.phase === "wave" ? 1 : 0, arrival);
+    for (const spawn of marks.spawns) {
       const c = this.point(spawn.x, spawn.y);
       const { rx, ry } = screenRadii(spawn);
-      paintPortal(this.ctx, c.x, c.y, rx * 0.85, ry * 0.9, now, world.phase === "wave" ? 1 : 0);
+      if (arrival > 0) {
+        const flare = Math.max(rx, ry) * (1.6 + arrival);
+        circle(ctx, c.x, c.y, flare);
+        ctx.fillStyle = radial(ctx, c.x, c.y, flare, [
+          [0, withAlpha(PALETTE.portal, 0.6 * arrival)],
+          [1, withAlpha(PALETTE.portal, 0)],
+        ]);
+        ctx.fill();
+      }
+      const swell = 1 + arrival * 0.35;
+      paintPortal(ctx, c.x, c.y, rx * 0.85 * swell, ry * 0.9 * swell, now, surge);
     }
-    const exit = regionOf(grid.exits);
-    if (exit) {
+    const hurt = frame.effects.coreHurt(frame.now);
+    for (const exit of marks.exits) {
       const c = this.point(exit.x, exit.y);
       const { rx, ry } = screenRadii(exit);
-      paintCore(this.ctx, c.x, c.y, Math.min(rx, ry) * 1.6, now, frame.effects.coreHurt(frame.now));
+      paintCore(ctx, c.x, c.y, Math.min(rx, ry) * 1.6, now, hurt);
     }
   }
 
@@ -247,6 +363,13 @@ export class CanvasRenderer {
     const size = this.layout.cellSize;
     const origin = this.cellOrigin(hover.x, hover.y);
 
+    if (selection.kind === "power") {
+      if (!simulation.content.hasPower(selection.power)) return;
+      const { spec } = simulation.content.power(selection.power);
+      if (spec.kind === "strike") this.drawStrikeReticle(frame, cellCenter(hover), spec.radius);
+      return;
+    }
+
     if (selection.kind === "build") {
       const def = simulation.content.tower(selection.tower);
       const placeable =
@@ -269,6 +392,58 @@ export class CanvasRenderer {
     ctx.strokeStyle = PALETTE.range;
     ctx.lineWidth = 1;
     ctx.strokeRect(origin.x + 0.5, origin.y + 0.5, size - 1, size - 1);
+  }
+
+  /** Where a targeted strike power will land: its blast circle, a crosshair and marked enemies. */
+  private drawStrikeReticle(
+    frame: RenderFrame,
+    center: { x: number; y: number },
+    radius: number,
+  ): void {
+    const { ctx } = this;
+    const size = this.layout.cellSize;
+    const color = "#f97316";
+    const p = this.point(center.x, center.y);
+    const reach = radius * size;
+    const pulse = frame.reducedMotion ? 0 : (frame.now / 900) % 1;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, reach, 0, TAU);
+    ctx.fillStyle = withAlpha("#ef4444", 0.16);
+    ctx.fill();
+    ctx.setLineDash([size * 0.22, size * 0.14]);
+    ctx.lineDashOffset = -pulse * size * 0.72;
+    ctx.strokeStyle = withAlpha("#fdba74", 0.95);
+    ctx.lineWidth = Math.max(1.5, size * 0.06);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const arm = Math.min(reach * 0.35, size * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(p.x - arm, p.y);
+    ctx.lineTo(p.x - arm * 0.35, p.y);
+    ctx.moveTo(p.x + arm * 0.35, p.y);
+    ctx.lineTo(p.x + arm, p.y);
+    ctx.moveTo(p.x, p.y - arm);
+    ctx.lineTo(p.x, p.y - arm * 0.35);
+    ctx.moveTo(p.x, p.y + arm * 0.35);
+    ctx.lineTo(p.x, p.y + arm);
+    ctx.strokeStyle = "#fff7ed";
+    ctx.lineWidth = Math.max(1.5, size * 0.05);
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    ctx.strokeStyle = withAlpha(color, 0.9);
+    ctx.lineWidth = Math.max(1, size * 0.04);
+    for (const enemy of frame.simulation.world.enemies) {
+      const x = lerp(enemy.prevX, enemy.x, frame.alpha);
+      const y = lerp(enemy.prevY, enemy.y, frame.alpha);
+      if (Math.hypot(x - center.x, y - center.y) > radius) continue;
+      const q = this.point(x, y);
+      circle(ctx, q.x, q.y, enemy.def.radius * size * 1.35);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private drawTowerSprites(
@@ -305,6 +480,8 @@ export class CanvasRenderer {
   }
 
   private drawTower(tower: Readonly<TowerState>, frame: RenderFrame): void {
+    const { ctx } = this;
+    const size = this.layout.cellSize;
     const center = towerCenter(tower);
     const c = this.point(center.x, center.y);
     const art = towerArt(tower.def.id);
@@ -314,15 +491,69 @@ export class CanvasRenderer {
         ? 0
         : frame.now / 2600
       : screenAngle(this.layout, frame.aim.angle(tower.id, frame.now));
-    const kick = spin ? 0 : frame.aim.recoil(tower.id, frame.now) * this.layout.cellSize * 0.08;
-    this.drawTowerSprites(tower.def.id, tower.level, c.x, c.y, angle, kick);
+    const kick = spin ? 0 : frame.aim.recoil(tower.id, frame.now) * size * 0.08;
+
+    const build = frame.effects.buildProgress(tower.id, frame.now);
+    if (build < 1) {
+      // Dropping in: a shadow waits on the cell while the tower falls onto it.
+      const pose = buildPop(build);
+      ctx.save();
+      ctx.fillStyle = PALETTE.shadow;
+      ctx.globalAlpha = 1 - pose.lift;
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y + size * 0.1, size * 0.42, size * 0.3, 0, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = pose.alpha;
+      ctx.translate(c.x, c.y - pose.lift * size);
+      ctx.scale(pose.scale, pose.scale);
+      this.drawTowerSprites(tower.def.id, tower.level, 0, 0, angle, kick);
+      ctx.restore();
+    } else {
+      this.drawTowerSprites(tower.def.id, tower.level, c.x, c.y, angle, kick);
+    }
+
+    const flash = frame.effects.upgradeFlash(tower.id, frame.now);
+    if (flash > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = flash * 0.8;
+      this.drawTowerSprites(tower.def.id, tower.level, c.x, c.y, angle, kick);
+      ctx.restore();
+    }
+  }
+
+  /** Killed enemies swell, flare white and fade out rather than vanishing. */
+  private drawDying(frame: RenderFrame): void {
+    const { ctx } = this;
+    for (const dead of frame.effects.dying(frame.now)) {
+      const t = (frame.now - dead.start) / DEATH_MS;
+      if (t < 0 || t >= 1) continue;
+      const art = enemyArt(dead.enemy);
+      const color = enemyColor(dead.enemy);
+      const extent = dead.radius * art.extent;
+      const paint = (g: CanvasRenderingContext2D, cell: number): void => {
+        art.body(g, dead.radius * cell, color);
+      };
+      const p = this.point(dead.x, dead.y);
+      const heading = screenAngle(this.layout, dead.heading);
+      const grow = 1 + 0.45 * t;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(grow, grow);
+      ctx.globalAlpha = (1 - t) * (1 - t);
+      this.sprites.draw(ctx, `enemy:${dead.enemy}`, extent, paint, 0, 0, heading);
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = (1 - t) * 0.7;
+      this.sprites.draw(ctx, `enemy:${dead.enemy}`, extent, paint, 0, 0, heading);
+      ctx.restore();
+    }
   }
 
   private drawEnemy(enemy: Readonly<EnemyState>, frame: RenderFrame): void {
     const { ctx } = this;
     const size = this.layout.cellSize;
     const { id } = enemy.def;
-    const p = this.point(
+    const ground = this.point(
       lerp(enemy.prevX, enemy.x, frame.alpha),
       lerp(enemy.prevY, enemy.y, frame.alpha),
     );
@@ -330,11 +561,25 @@ export class CanvasRenderer {
     const color = enemyColor(id);
     const heading = screenAngle(this.layout, enemyHeading(enemy));
     const art = enemyArt(id);
+    const flying = enemy.def.flying === true;
 
+    // Flyers stay on their true position but hover: their shadow falls away
+    // below them, smaller and softer, and the body bobs gently.
+    const bob =
+      flying && !frame.reducedMotion
+        ? Math.sin((frame.now / BOB_MS) * TAU + enemy.id) * r * 0.14
+        : 0;
+    const p = { x: ground.x, y: ground.y + bob };
     ctx.fillStyle = PALETTE.shadow;
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + r * 0.35, r * 1.05, r * 0.6, 0, 0, TAU);
+    if (flying) {
+      ctx.globalAlpha = 0.7;
+      ctx.ellipse(ground.x + r * 0.2, ground.y + r * 1.05, r * 0.7, r * 0.36, 0, 0, TAU);
+    } else {
+      ctx.ellipse(ground.x, ground.y + r * 0.35, r * 1.05, r * 0.6, 0, 0, TAU);
+    }
     ctx.fill();
+    ctx.globalAlpha = 1;
 
     if (isBoss(id)) {
       const pulse = frame.reducedMotion ? 0 : Math.sin(frame.now / 260);
@@ -344,15 +589,34 @@ export class CanvasRenderer {
       ctx.stroke();
     }
 
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(heading);
-    const stride = frame.reducedMotion ? 0 : (frame.now / 1000) * enemy.def.speed * 8 + enemy.id;
-    paintFeet(ctx, id, r, stride);
-    ctx.restore();
+    if (!flying) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(heading);
+      const stride = frame.reducedMotion ? 0 : (frame.now / 1000) * enemy.def.speed * 8 + enemy.id;
+      paintFeet(ctx, id, r, stride);
+      ctx.restore();
+    }
+
+    const extent = enemy.def.radius * art.extent;
+    const { flap } = art;
+    if (flap) {
+      const cycle = frame.reducedMotion ? 0.25 : (frame.now / FLAP_MS + enemy.id * 0.37) % 1;
+      const index = Math.floor(cycle * FLAP_FRAMES) % FLAP_FRAMES;
+      this.sprites.draw(
+        ctx,
+        `enemy-flap:${id}:${index}`,
+        extent,
+        (g, cell) => {
+          flap(g, enemy.def.radius * cell, color, index / FLAP_FRAMES);
+        },
+        p.x,
+        p.y,
+        heading,
+      );
+    }
 
     const key = `enemy:${id}`;
-    const extent = enemy.def.radius * art.extent;
     const paint = (g: CanvasRenderingContext2D, cell: number): void => {
       art.body(g, enemy.def.radius * cell, color);
     };
@@ -413,13 +677,56 @@ export class CanvasRenderer {
       );
       const kind = kinds.get(shot.towerId);
       if (shot.splashRadius > 0) {
-        paintShell(this.ctx, p.x, p.y, size, towerColor(kind ?? "cannon"));
+        if (kind === "mortar") paintMortarShell(this.ctx, p.x, p.y, size, towerColor(kind));
+        else paintShell(this.ctx, p.x, p.y, size, towerColor(kind ?? "cannon"));
         continue;
       }
       const aim = this.point(shot.aimX, shot.aimY);
       const angle = Math.atan2(aim.y - p.y, aim.x - p.x);
       paintDart(this.ctx, p.x, p.y, angle, size, towerColor(kind ?? "bolt"));
     }
+  }
+
+  /** An icy wash over the whole board just after Frostbind is cast. */
+  private drawFreeze(frame: RenderFrame, board: ScreenRect): void {
+    const amount = frame.effects.freezeOverlay(frame.now);
+    if (amount <= 0) return;
+    const { ctx } = this;
+    ctx.save();
+    ctx.fillStyle = withAlpha("#bae6fd", 0.24 * amount);
+    ctx.fillRect(board.x, board.y, board.width, board.height);
+    ctx.strokeStyle = withAlpha("#e0f2fe", 0.75 * amount);
+    ctx.lineWidth = Math.max(2, this.layout.cellSize * 0.14);
+    ctx.strokeRect(board.x, board.y, board.width, board.height);
+    ctx.restore();
+  }
+
+  /** The board dims for a heartbeat as a boss steps out of the rift. */
+  private drawBossShadow(frame: RenderFrame, board: ScreenRect): void {
+    const arrival = frame.effects.bossArrival(frame.now);
+    if (arrival <= 0) return;
+    const { ctx } = this;
+    ctx.save();
+    ctx.fillStyle = `rgba(10, 2, 14, ${0.5 * arrival * arrival * arrival})`;
+    ctx.fillRect(board.x, board.y, board.width, board.height);
+    paintEdgeGlow(ctx, board, PALETTE.portal, 0.35 * arrival, this.layout.cellSize * 1.2);
+    ctx.restore();
+  }
+
+  /** A red pulse at the board's edges while the crystal is close to falling. */
+  private drawDanger(frame: RenderFrame, board: ScreenRect): void {
+    const { world, content } = frame.simulation;
+    const low =
+      frame.lowLives ??
+      (world.phase !== "won" &&
+        world.phase !== "lost" &&
+        world.lives > 0 &&
+        world.lives <= content.rules.startingLives * 0.25);
+    if (!low) return;
+    const pulse = frame.reducedMotion ? 0.6 : 0.5 + 0.5 * Math.sin(frame.now / 320);
+    this.ctx.save();
+    paintEdgeGlow(this.ctx, board, DANGER_COLOR, 0.2 + 0.25 * pulse, this.layout.cellSize * 1.4);
+    this.ctx.restore();
   }
 
   private drawSelection(frame: RenderFrame): void {
@@ -435,6 +742,65 @@ export class CanvasRenderer {
     this.ctx.roundRect(origin.x + 1, origin.y + 1, size - 2, size - 2, size * 0.14);
     this.ctx.stroke();
     this.strokeRange(towerCenter(tower), currentLevel(tower).range, towerColor(tower.def.id));
+  }
+
+  /** Tutorial call-out: glowing, pulsing cells and a bouncing pointer on the first one. */
+  private drawGuide(frame: RenderFrame): void {
+    const cells = frame.guide;
+    const first = cells?.[0];
+    if (!cells || !first) return;
+    const { ctx } = this;
+    const size = this.layout.cellSize;
+    const pulse = frame.reducedMotion ? 0.7 : 0.5 + 0.5 * Math.sin(frame.now / 260);
+    ctx.save();
+    ctx.lineJoin = "round";
+    for (const cell of cells) {
+      const o = this.cellOrigin(cell.x, cell.y);
+      const grow = size * 0.04 * pulse;
+      ctx.beginPath();
+      ctx.roundRect(
+        o.x + 1 - grow,
+        o.y + 1 - grow,
+        size - 2 + grow * 2,
+        size - 2 + grow * 2,
+        size * 0.18,
+      );
+      ctx.fillStyle = withAlpha(GUIDE_COLOR, 0.14 + 0.14 * pulse);
+      ctx.fill();
+      ctx.strokeStyle = withAlpha(GUIDE_COLOR, 0.18 + 0.3 * pulse);
+      ctx.lineWidth = Math.max(4, size * 0.24);
+      ctx.stroke();
+      ctx.strokeStyle = "#fef9c3";
+      ctx.lineWidth = Math.max(2, size * 0.07);
+      ctx.stroke();
+    }
+
+    // The pointer sits above the cell, or below it when the cell is at the top edge.
+    const c = this.point(first.x + 0.5, first.y + 0.5);
+    const bounce = frame.reducedMotion ? 0 : Math.abs(Math.sin(frame.now / 300)) * size * 0.28;
+    const above = c.y - size * 1.35 >= 0;
+    const dir = above ? 1 : -1;
+    const tipY = c.y - dir * (size * 0.62 + bounce);
+    const head = size * 0.3;
+    const stem = size * 0.13;
+    ctx.beginPath();
+    ctx.moveTo(c.x, tipY);
+    ctx.lineTo(c.x - head, tipY - dir * head);
+    ctx.lineTo(c.x - stem, tipY - dir * head);
+    ctx.lineTo(c.x - stem, tipY - dir * size * 0.62);
+    ctx.lineTo(c.x + stem, tipY - dir * size * 0.62);
+    ctx.lineTo(c.x + stem, tipY - dir * head);
+    ctx.lineTo(c.x + head, tipY - dir * head);
+    ctx.closePath();
+    ctx.shadowColor = withAlpha(GUIDE_COLOR, 0.9);
+    ctx.shadowBlur = size * 0.4;
+    ctx.fillStyle = GUIDE_COLOR;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "rgba(5, 8, 11, 0.85)";
+    ctx.lineWidth = Math.max(1.5, size * 0.05);
+    ctx.stroke();
+    ctx.restore();
   }
 
   private strokeRange(center: { x: number; y: number }, range: number, color: string): void {

@@ -1,6 +1,7 @@
 import { applyDamage } from "../combat/damage";
 import { distance } from "../geometry";
 import type { EnemyState, ProjectileState } from "../state";
+import { canHit } from "../state";
 import type { System, TickContext } from "../tick";
 
 function impact(
@@ -12,7 +13,7 @@ function impact(
     const center = { x: projectile.x, y: projectile.y };
     ctx.events.emit("explosion", { ...center, radius: projectile.splashRadius });
     for (const enemy of ctx.world.enemies) {
-      if (distance(center, enemy) <= projectile.splashRadius) {
+      if (canHit(projectile.hitsAir, enemy) && distance(center, enemy) <= projectile.splashRadius) {
         applyDamage(ctx, enemy, projectile.damage);
       }
     }

@@ -11,6 +11,7 @@ import { checkPlacement } from "./placement";
 import { Rng } from "./rng";
 import { hashWorld } from "./state-hash";
 import type { WorldState, WorldView } from "./state";
+import { EnemyAbilitySystem, PowerCooldownSystem } from "./systems/abilities";
 import { EnemyMovementSystem } from "./systems/movement";
 import { ProjectileSystem } from "./systems/projectiles";
 import { ResolutionSystem } from "./systems/resolution";
@@ -25,13 +26,15 @@ export interface SimulationOptions {
   readonly systems?: readonly System[];
 }
 
-/** Order matters: spawn, move, shoot, fly, then settle the outcome. */
+/** Order matters: spawn, move, use abilities, shoot, fly, recharge, then settle the outcome. */
 export function createDefaultSystems(): System[] {
   return [
     new WaveSpawnSystem(),
     new EnemyMovementSystem(),
+    new EnemyAbilitySystem(),
     new TowerSystem(),
     new ProjectileSystem(),
+    new PowerCooldownSystem(),
     new ResolutionSystem(),
   ];
 }
@@ -63,10 +66,12 @@ export class Simulation {
       lives: content.rules.startingLives,
       phase: "building",
       wavesStarted: 0,
+      wavesCleared: 0,
       enemies: [],
       towers: [],
       projectiles: [],
       spawnQueue: [],
+      powers: content.powers.map((power) => ({ id: power.id, cooldown: 0 })),
       nextId: 1,
     };
 
@@ -90,6 +95,13 @@ export class Simulation {
   get isOver(): boolean {
     const { phase } = this.internals.world;
     return phase === "won" || phase === "lost";
+  }
+
+  /** True when the next wave may be started now, including an early call mid-wave. */
+  get canStartWave(): boolean {
+    const { world } = this.internals;
+    if (this.isOver || world.wavesStarted >= this.content.waves.length) return false;
+    return world.phase === "building" || world.spawnQueue.length === 0;
   }
 
   apply(command: Command): CommandResult {

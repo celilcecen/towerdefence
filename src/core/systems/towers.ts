@@ -15,7 +15,7 @@ export class TowerSystem implements System {
 
       const level = currentLevel(tower);
       const origin = towerCenter(tower);
-      const inRange = enemiesInRange(enemies, origin, level.range);
+      const inRange = enemiesInRange(enemies, origin, level.range, tower.def.groundOnly !== true);
       const target = TARGETING[tower.targeting](inRange, origin);
       if (!target) continue;
 

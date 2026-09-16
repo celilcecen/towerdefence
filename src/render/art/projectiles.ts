@@ -69,3 +69,66 @@ export function paintShell(
   ctx.lineWidth = Math.max(1, s * 0.02);
   ctx.stroke();
 }
+
+/**
+ * A heavy mortar round: bigger than a cannonball, banded in bronze, with a
+ * burning fuse. Its shadow falls far below because the shell is lobbed high.
+ */
+export function paintMortarShell(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  s: number,
+  color: string,
+): void {
+  const r = s * 0.16;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+  ctx.beginPath();
+  ctx.ellipse(x + r * 0.6, y + r * 2.4, r * 0.8, r * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+  circle(ctx, x, y, r * 1.8);
+  ctx.fillStyle = radial(ctx, x, y, r * 1.8, [
+    [0, withAlpha(color, 0.45)],
+    [1, withAlpha(color, 0)],
+  ]);
+  ctx.fill();
+  circle(ctx, x, y, r);
+  ctx.fillStyle = radial(
+    ctx,
+    x,
+    y,
+    r,
+    [
+      [0, "#a8a29e"],
+      [0.55, "#3f3a36"],
+      [1, "#0c0a09"],
+    ],
+    x - r * 0.4,
+    y - r * 0.45,
+  );
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = color;
+  ctx.fillRect(x - r, y - r * 0.14, r * 2, r * 0.28);
+  ctx.restore();
+  ctx.strokeStyle = "#0c0a09";
+  ctx.lineWidth = Math.max(1, s * 0.02);
+  ctx.stroke();
+
+  const fx = x + r * 0.55;
+  const fy = y - r * 0.9;
+  ctx.strokeStyle = "#57534e";
+  ctx.lineWidth = Math.max(1, s * 0.025);
+  ctx.beginPath();
+  ctx.moveTo(x + r * 0.35, y - r * 0.6);
+  ctx.lineTo(fx, fy);
+  ctx.stroke();
+  circle(ctx, fx, fy, r * 0.5);
+  ctx.fillStyle = radial(ctx, fx, fy, r * 0.5, [
+    [0, "#fffbeb"],
+    [0.35, lighten("#f59e0b", 0.2)],
+    [1, withAlpha("#f97316", 0)],
+  ]);
+  ctx.fill();
+}

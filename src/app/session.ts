@@ -1,27 +1,34 @@
-import type { Command, CommandResult } from "../core/commands";
+import type { Command, CommandError, CommandResult } from "../core/commands";
 import type { ContentRegistry } from "../core/content-registry";
 import type { TargetingMode } from "../core/content-types";
 import { EventBus } from "../core/events";
 import type { Cell } from "../core/geometry";
-import type { BestRecord, RecordStore } from "../core/records";
-import { isBetter } from "../core/records";
+import { cellCenter } from "../core/geometry";
 import { Simulation } from "../core/simulation";
-import type { TowerState } from "../core/state";
+import type { PowerState, TowerState } from "../core/state";
 import type { LoopControl } from "./game-loop";
-import { COMMAND_ERROR_MESSAGES } from "./messages";
 
 export type Selection =
   | { readonly kind: "none" }
   | { readonly kind: "build"; readonly tower: string }
-  | { readonly kind: "tower"; readonly towerId: number };
+  | { readonly kind: "tower"; readonly towerId: number }
+  | { readonly kind: "power"; readonly power: string };
 
-export interface GameResult extends BestRecord {
-  readonly newRecord: boolean;
+export interface SessionOutcome {
+  readonly won: boolean;
+  /** Waves started when the game ended. */
+  readonly wave: number;
+  readonly lives: number;
 }
 
 export interface SessionEvents {
-  restarted: { readonly simulation: Simulation };
-  notice: { readonly message: string };
+  /** A new simulation replaced the old one: a new level, or a restart. */
+  loaded: { readonly simulation: Simulation };
+  /** A command was refused; adapters decide how to tell the player. */
+  rejected: { readonly error: CommandError };
+  /** A build tap landed outside the cells the tutorial allows. */
+  offGuide: { readonly cell: Cell };
+  finished: SessionOutcome;
 }
 
 export const SPEEDS: readonly number[] = [1, 2, 3];
@@ -29,10 +36,10 @@ export const SPEEDS: readonly number[] = [1, 2, 3];
 const NONE: Selection = { kind: "none" };
 
 /**
- * Application state around one game: selection, hover, pause, speed, the
- * persisted best record. It translates player gestures into simulation
- * commands and turns rejected commands into player-facing notices. It has no
- * DOM dependency, so every interaction rule is unit-tested.
+ * Application state around one game: selection, hover, pause and speed. It
+ * translates player gestures into simulation commands and reports refused
+ * commands and the final outcome. It has no DOM dependency, so every
+ * interaction rule is unit-tested.
  */
 export class GameSession implements LoopControl {
   readonly events = new EventBus<SessionEvents>();
@@ -43,20 +50,22 @@ export class GameSession implements LoopControl {
   private sim: Simulation;
   private currentSelection: Selection = NONE;
   private hoverCell: Cell | undefined;
-  private result: GameResult | undefined;
-  private bestRecord: BestRecord | undefined;
+  private finalOutcome: SessionOutcome | undefined;
+  private guideCells: readonly Cell[] | undefined;
 
   constructor(
-    private readonly content: ContentRegistry,
-    private readonly records: RecordStore,
+    private registry: ContentRegistry,
     private readonly nextSeed: () => number,
   ) {
-    this.bestRecord = records.load();
     this.sim = this.createSimulation();
   }
 
   get simulation(): Simulation {
     return this.sim;
+  }
+
+  get content(): ContentRegistry {
+    return this.registry;
   }
 
   get selection(): Selection {
@@ -67,12 +76,8 @@ export class GameSession implements LoopControl {
     return this.hoverCell;
   }
 
-  get lastResult(): GameResult | undefined {
-    return this.result;
-  }
-
-  get best(): BestRecord | undefined {
-    return this.bestRecord;
+  get outcome(): SessionOutcome | undefined {
+    return this.finalOutcome;
   }
 
   get selectedTower(): Readonly<TowerState> | undefined {
@@ -81,30 +86,65 @@ export class GameSession implements LoopControl {
     return this.sim.world.towers.find((t) => t.id === selection.towerId);
   }
 
-  /** Play button: starts the first game, or a fresh one after a finished game. */
-  play(): void {
-    if (this.sim.isOver) this.restart();
+  /** Swaps in different content (another level) and waits for `start`. */
+  load(content: ContentRegistry): void {
+    this.registry = content;
+    this.reset();
+    this.started = false;
+  }
+
+  /** Begins play on the loaded simulation. */
+  start(): void {
     this.started = true;
     this.paused = false;
   }
 
+  /** A fresh game on the same content, started immediately. */
   restart(): void {
-    this.sim = this.createSimulation();
-    this.currentSelection = NONE;
-    this.result = undefined;
-    this.paused = false;
-    this.events.emit("restarted", { simulation: this.sim });
+    this.reset();
+    this.start();
   }
 
   step(): void {
-    if (this.started) this.sim.step();
+    if (this.started && !this.paused) this.sim.step();
   }
 
   selectBuild(tower: string): void {
-    if (!this.content.hasTower(tower)) return;
+    if (!this.registry.hasTower(tower)) return;
     const current = this.currentSelection;
     this.currentSelection =
       current.kind === "build" && current.tower === tower ? NONE : { kind: "build", tower };
+  }
+
+  /**
+   * Targeted powers enter aiming mode (tap again to cancel); untargeted
+   * powers fire straight away.
+   */
+  selectPower(power: string): void {
+    if (!this.started || !this.registry.hasPower(power)) return;
+    const current = this.currentSelection;
+    if (current.kind === "power" && current.power === power) {
+      this.currentSelection = NONE;
+      return;
+    }
+    if (this.registry.power(power).spec.kind === "strike") {
+      const ready = this.powerState(power);
+      if (ready && ready.cooldown > 0) {
+        this.events.emit("rejected", { error: "power-not-ready" });
+        return;
+      }
+      if (this.sim.world.phase !== "wave") {
+        this.events.emit("rejected", { error: "no-wave-active" });
+        return;
+      }
+      this.currentSelection = { kind: "power", power };
+      return;
+    }
+    this.dispatch({ type: "castPower", power, x: 0, y: 0 });
+  }
+
+  powerState(power: string): Readonly<PowerState> | undefined {
+    return this.sim.world.powers.find((p) => p.id === power);
   }
 
   cancel(): void {
@@ -115,16 +155,37 @@ export class GameSession implements LoopControl {
     this.hoverCell = cell;
   }
 
-  /** A tap or click on the board: build in build mode, otherwise inspect. */
+  /** A tap or click on the board: build, aim a power, or inspect. */
   activateCell(cell: Cell): void {
-    if (!this.started || this.sim.isOver) return;
+    if (!this.started || this.paused || this.sim.isOver) return;
     const selection = this.currentSelection;
-    if (selection.kind === "build") {
-      this.dispatch({ type: "placeTower", tower: selection.tower, x: cell.x, y: cell.y });
-      return;
+    switch (selection.kind) {
+      case "build":
+        if (this.guideCells && !this.guideCells.some((c) => c.x === cell.x && c.y === cell.y)) {
+          this.events.emit("offGuide", { cell });
+          return;
+        }
+        this.dispatch({ type: "placeTower", tower: selection.tower, x: cell.x, y: cell.y });
+        return;
+      case "power": {
+        const center = cellCenter(cell);
+        if (this.dispatch({ type: "castPower", power: selection.power, ...center }).ok) {
+          this.currentSelection = NONE;
+        }
+        return;
+      }
+      case "none":
+      case "tower": {
+        const occupant = this.sim.grid.occupantAt(cell.x, cell.y);
+        this.currentSelection =
+          occupant === undefined ? NONE : { kind: "tower", towerId: occupant };
+      }
     }
-    const occupant = this.sim.grid.occupantAt(cell.x, cell.y);
-    this.currentSelection = occupant === undefined ? NONE : { kind: "tower", towerId: occupant };
+  }
+
+  /** Restricts building to these cells (the tutorial); undefined lifts the restriction. */
+  setGuide(cells: readonly Cell[] | undefined): void {
+    this.guideCells = cells;
   }
 
   upgradeSelected(): void {
@@ -142,12 +203,17 @@ export class GameSession implements LoopControl {
     if (tower) this.dispatch({ type: "setTargeting", towerId: tower.id, mode });
   }
 
+  /** Starts the next wave, or calls it early while one is running. */
   startWave(): void {
-    if (this.started) this.dispatch({ type: "startWave" });
+    if (this.started && !this.paused) this.dispatch({ type: "startWave" });
   }
 
   togglePause(): void {
-    if (this.started && !this.sim.isOver) this.paused = !this.paused;
+    this.setPaused(!this.paused);
+  }
+
+  setPaused(paused: boolean): void {
+    if (this.started && !this.sim.isOver) this.paused = paused;
   }
 
   cycleSpeed(): void {
@@ -155,23 +221,31 @@ export class GameSession implements LoopControl {
     this.speed = SPEEDS[(index + 1) % SPEEDS.length] ?? 1;
   }
 
+  private reset(): void {
+    this.sim = this.createSimulation();
+    this.currentSelection = NONE;
+    this.finalOutcome = undefined;
+    this.paused = false;
+    this.events.emit("loaded", { simulation: this.sim });
+  }
+
   private dispatch(command: Command): CommandResult {
     const result = this.sim.apply(command);
-    if (!result.ok) this.events.emit("notice", { message: COMMAND_ERROR_MESSAGES[result.error] });
+    if (!result.ok) this.events.emit("rejected", { error: result.error });
     return result;
   }
 
   private createSimulation(): Simulation {
-    const sim = new Simulation(this.content, { seed: this.nextSeed() });
+    const sim = new Simulation(this.registry, { seed: this.nextSeed() });
     sim.events.on("gameOver", ({ won }) => {
-      const record: BestRecord = { wave: sim.world.wavesStarted, won, lives: sim.world.lives };
-      const newRecord = isBetter(record, this.bestRecord);
-      if (newRecord) {
-        this.bestRecord = record;
-        this.records.save(record);
-      }
-      this.result = { ...record, newRecord };
+      const outcome: SessionOutcome = {
+        won,
+        wave: sim.world.wavesStarted,
+        lives: sim.world.lives,
+      };
+      this.finalOutcome = outcome;
       this.currentSelection = NONE;
+      this.events.emit("finished", outcome);
     });
     return sim;
   }

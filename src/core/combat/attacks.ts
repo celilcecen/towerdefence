@@ -1,6 +1,7 @@
 import type { AttackKind, AttackSpec, TowerLevel } from "../content-types";
+import { distance } from "../geometry";
 import type { EnemyState, TowerState } from "../state";
-import { towerCenter } from "../state";
+import { canHit, towerCenter } from "../state";
 import type { TickContext } from "../tick";
 import { applyDamage, applySlow } from "./damage";
 
@@ -19,6 +20,29 @@ type AttackRegistry = {
   readonly [K in AttackKind]: AttackBehaviour<Extract<AttackSpec, { kind: K }>>;
 };
 
+const hitsAir = (tower: TowerState): boolean => tower.def.groundOnly !== true;
+
+/** Nearest living, hittable enemy within reach that the arc has not touched; older wins ties. */
+function nextJump(
+  ctx: TickContext,
+  from: EnemyState,
+  reach: number,
+  air: boolean,
+  visited: ReadonlySet<number>,
+): EnemyState | undefined {
+  let best: EnemyState | undefined;
+  let bestDistance = Infinity;
+  for (const enemy of ctx.world.enemies) {
+    if (enemy.status !== "alive" || visited.has(enemy.id) || !canHit(air, enemy)) continue;
+    const d = distance(from, enemy);
+    if (d <= reach && d < bestDistance) {
+      best = enemy;
+      bestDistance = d;
+    }
+  }
+  return best;
+}
+
 /**
  * One behaviour per attack kind. A new kind is a new entry here plus a new
  * member of the AttackSpec union; the tower system itself never changes.
@@ -34,6 +58,7 @@ export const ATTACKS: AttackRegistry = {
         damage: spec.damage,
         speed: spec.speed,
         splashRadius: spec.splashRadius,
+        hitsAir: hitsAir(tower),
         x: origin.x,
         y: origin.y,
         prevX: origin.x,
@@ -59,6 +84,26 @@ export const ATTACKS: AttackRegistry = {
         applyDamage(ctx, enemy, spec.damage);
         applySlow(enemy, spec.slow);
       }
+    },
+  },
+  chain: {
+    fire(ctx, tower, _level, spec, target) {
+      // The whole path is chosen before any damage lands, so a kill mid-chain
+      // cannot change which enemies the arc reaches.
+      const targets: EnemyState[] = [target];
+      const visited = new Set([target.id]);
+      let current = target;
+      for (let jump = 0; jump < spec.jumps; jump++) {
+        const next = nextJump(ctx, current, spec.jumpRange, hitsAir(tower), visited);
+        if (!next) break;
+        targets.push(next);
+        visited.add(next.id);
+        current = next;
+      }
+      ctx.events.emit("chainFired", { tower, targets });
+      targets.forEach((enemy, i) => {
+        applyDamage(ctx, enemy, spec.damage * spec.falloff ** i);
+      });
     },
   },
 };

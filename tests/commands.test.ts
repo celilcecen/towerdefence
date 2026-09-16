@@ -189,7 +189,7 @@ describe("startWave", () => {
     expect(sim.apply({ type: "startWave" })).toEqual({ ok: true });
     expect(sim.world.phase).toBe("wave");
     expect(sim.world.wavesStarted).toBe(1);
-    expect(started).toEqual([{ wave: 1 }]);
+    expect(started).toEqual([{ wave: 1, early: false, bonus: 0 }]);
     expect(sim.apply({ type: "startWave" })).toEqual({ ok: false, error: "wave-in-progress" });
   });
 

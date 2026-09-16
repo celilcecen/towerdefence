@@ -34,6 +34,8 @@ const TOWER_COLORS: Readonly<Record<string, string>> = {
   cannon: "#f59e0b",
   frost: "#22d3ee",
   spire: "#e879f9",
+  arc: "#818cf8",
+  mortar: "#d08c4a",
 };
 
 const ENEMY_COLORS: Readonly<Record<string, string>> = {
@@ -41,9 +43,15 @@ const ENEMY_COLORS: Readonly<Record<string, string>> = {
   grunt: "#fb923c",
   brute: "#ef4444",
   warden: "#a855f7",
+  wisp: "#b9f5ec",
+  mender: "#10b981",
+  harrier: "#3b82f6",
+  brood: "#9bbf3a",
+  broodling: "#c3dc5c",
+  tyrant: "#d6246e",
 };
 
-const BOSSES: ReadonlySet<string> = new Set(["warden"]);
+const BOSSES: ReadonlySet<string> = new Set(["warden", "tyrant"]);
 
 export const towerColor = (id: string): string => TOWER_COLORS[id] ?? PALETTE.fallback;
 export const isBoss = (id: string): boolean => BOSSES.has(id);

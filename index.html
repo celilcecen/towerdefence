@@ -2,42 +2,52 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0a0e13" />
     <meta
       name="description"
-      content="Gridlock is a maze-building tower defense game. Place towers to shape the enemy's path and hold 15 waves."
+      content="Gridlock: The Last Crystal is a maze-building tower defense game. Wall the monsters into the longest road across a 12-level story campaign."
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Gridlock · Tower Defense</title>
+    <title>Gridlock · The Last Crystal</title>
   </head>
   <body>
-    <div class="app">
+    <div id="app" class="app" data-screen="home" data-theme="meadow">
       <header class="hud">
-        <div class="brand" aria-label="Gridlock">GRIDLOCK</div>
+        <button
+          id="menu-button"
+          class="icon-button"
+          type="button"
+          data-t-aria="hud.menu"
+          aria-label="Menu"
+          aria-keyshortcuts="P"
+        >
+          <span class="pause-glyph" aria-hidden="true"></span>
+        </button>
         <dl class="stats">
           <div class="stat stat-lives">
-            <dt>Lives</dt>
+            <dt data-t="hud.lives">Lives</dt>
             <dd id="lives">0</dd>
           </div>
           <div class="stat stat-gold">
-            <dt>Gold</dt>
+            <dt data-t="hud.gold">Gold</dt>
             <dd id="gold">0</dd>
           </div>
           <div class="stat stat-wave">
-            <dt>Wave</dt>
+            <dt data-t="hud.wave">Wave</dt>
             <dd id="wave">0</dd>
           </div>
         </dl>
         <div class="controls">
-          <button id="pause" class="ghost" type="button" aria-pressed="false" aria-keyshortcuts="P">
-            Pause
-          </button>
           <button
             id="speed"
             class="ghost"
             type="button"
+            data-t-aria="hud.speed"
             aria-label="Game speed"
             aria-keyshortcuts="F"
           >
@@ -50,78 +60,273 @@
       </header>
 
       <main id="stage" class="stage">
-        <canvas
-          id="board"
-          aria-label="Game board. Select a tower, then click a cell to build."
-        ></canvas>
+        <canvas id="board" data-t-aria="hud.boardLabel" aria-label="Game board"></canvas>
         <div id="wave-preview" class="chip wave-preview" hidden>
-          <span id="wave-preview-label" class="chip-label">Next wave</span>
+          <span id="wave-preview-label" class="chip-label"></span>
           <span id="wave-preview-list" class="preview-list"></span>
         </div>
+        <div id="powers" class="powers" role="toolbar" data-t-aria="hud.powers" hidden></div>
         <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
       </main>
 
       <footer class="dock">
         <p id="hint" class="hint" hidden></p>
-        <div id="build-dock" class="build-dock" role="toolbar" aria-label="Build towers"></div>
-        <section id="tower-panel" class="tower-panel" aria-label="Selected tower" hidden>
+        <div id="build-dock" class="build-dock" role="toolbar" data-t-aria="hud.buildTowers"></div>
+        <section id="tower-panel" class="tower-panel" data-t-aria="panel.label" hidden>
           <div class="panel-head">
             <canvas id="panel-icon" class="panel-icon" aria-hidden="true"></canvas>
             <h2 id="panel-title"></h2>
-            <button id="panel-close" class="icon" type="button" aria-label="Close tower panel">
+            <button
+              id="panel-close"
+              class="icon"
+              type="button"
+              data-t-aria="panel.close"
+              aria-label="Close"
+            >
               ×
             </button>
           </div>
           <p id="panel-stats" class="panel-stats"></p>
           <p id="panel-next" class="panel-next"></p>
-          <div id="targeting" class="segments" role="group" aria-label="Targeting"></div>
+          <div id="targeting" class="segments" role="group" data-t-aria="panel.targeting"></div>
           <div class="panel-actions">
-            <button id="upgrade" class="primary" type="button" aria-keyshortcuts="U">
-              Upgrade
-            </button>
-            <button id="sell" class="ghost" type="button" aria-keyshortcuts="S">Sell</button>
+            <button id="upgrade" class="primary" type="button" aria-keyshortcuts="U"></button>
+            <button id="sell" class="ghost" type="button" aria-keyshortcuts="S"></button>
           </div>
         </section>
       </footer>
 
-      <div id="overlay" class="overlay">
-        <div class="card" role="dialog" aria-modal="true" aria-labelledby="overlay-title">
-          <h1 id="overlay-title">Gridlock</h1>
-          <p id="overlay-text" class="lead">
-            Monsters march from the red rift to your green crystal. Build towers to shoot them, and
-            to wall them into the longest possible route.
-          </p>
-          <div id="overlay-intro" class="intro">
-            <ol class="steps">
-              <li><strong>Pick a tower</strong> from the bar at the bottom.</li>
-              <li>
-                <strong>Tap an empty tile</strong> to build. Towers are walls: enemies walk around
-                them, and you can never seal the path completely.
-              </li>
-              <li>
-                <strong>Start the wave.</strong> Every enemy that reaches the crystal costs lives.
-                Survive 15 waves.
-              </li>
-            </ol>
-            <div class="legend">
-              <section aria-labelledby="legend-towers-title">
-                <h2 id="legend-towers-title">Your towers</h2>
-                <ul id="legend-towers" class="legend-list"></ul>
-              </section>
-              <section aria-labelledby="legend-enemies-title">
-                <h2 id="legend-enemies-title">Enemies</h2>
-                <ul id="legend-enemies" class="legend-list"></ul>
-              </section>
-            </div>
-            <p class="keys">
-              1–4 build · Space next wave · U upgrade · S sell · P pause · F speed · Esc cancel
-            </p>
+      <section id="screen-home" class="screen screen-home" aria-labelledby="home-title">
+        <canvas id="home-backdrop" class="backdrop" aria-hidden="true"></canvas>
+        <div class="home">
+          <div class="brand-block">
+            <h1 id="home-title" class="logo" data-t="app.title">Gridlock</h1>
+            <p class="subtitle" data-t="app.subtitle">The Last Crystal</p>
+            <p class="tagline" data-t="app.tagline"></p>
           </div>
-          <p id="overlay-record" class="record"></p>
-          <button id="play" class="primary large" type="button">Play</button>
-          <a id="repo-link" class="repo" target="_blank" rel="noopener noreferrer"
-            >How it's built · source on GitHub</a
+          <nav class="menu">
+            <button id="home-continue" class="menu-button primary" type="button" hidden>
+              <span data-t="home.continue">Continue</span>
+              <small id="home-continue-level"></small>
+            </button>
+            <button id="home-campaign" class="menu-button" type="button">
+              <span data-t="home.campaign">Campaign</span>
+              <small id="home-stars"></small>
+            </button>
+            <button id="home-classic" class="menu-button" type="button">
+              <span data-t="home.classic">Classic</span>
+              <small id="home-classic-best"></small>
+            </button>
+            <div class="menu-row">
+              <button id="home-help" class="menu-button compact" type="button">
+                <span data-t="home.howToPlay">How to play</span>
+              </button>
+              <button id="home-settings" class="menu-button compact" type="button">
+                <span data-t="home.settings">Settings</span>
+              </button>
+            </div>
+          </nav>
+          <a
+            id="repo-link"
+            class="repo"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-t="home.source"
+            >Source on GitHub</a
           >
+        </div>
+      </section>
+
+      <section id="screen-map" class="screen screen-map" aria-labelledby="map-title" hidden>
+        <div class="map">
+          <header class="screen-head">
+            <button id="map-back" class="ghost" type="button" data-t="map.back">Back</button>
+            <h1 id="map-title" data-t="map.title">Campaign</h1>
+            <span id="map-stars" class="star-count"></span>
+          </header>
+          <div id="map-chapters" class="chapters"></div>
+        </div>
+      </section>
+
+      <section
+        id="screen-briefing"
+        class="screen screen-briefing"
+        aria-labelledby="brief-title"
+        hidden
+      >
+        <div class="card brief-card">
+          <canvas id="brief-scene" class="scene-banner" aria-hidden="true"></canvas>
+          <p id="brief-chapter" class="eyebrow"></p>
+          <h1 id="brief-title"></h1>
+          <div class="speaker">
+            <span class="portrait" aria-hidden="true"></span>
+            <strong data-t="briefing.speaker">Keeper Ilka</strong>
+          </div>
+          <div id="brief-text" class="story"></div>
+          <div id="brief-new" class="new-things"></div>
+          <p id="brief-meta" class="meta"></p>
+          <div class="actions">
+            <button id="brief-back" class="ghost large" type="button" data-t="briefing.back">
+              Map
+            </button>
+            <button id="brief-start" class="primary large" type="button" data-t="briefing.start">
+              Defend
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="screen-result"
+        class="screen screen-result"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="result-title"
+        hidden
+      >
+        <div class="card result-card">
+          <canvas id="result-ending" class="scene-banner" aria-hidden="true" hidden></canvas>
+          <h1 id="result-title"></h1>
+          <div id="result-stars" class="stars" role="img"></div>
+          <p id="result-text" class="lead"></p>
+          <p id="result-story" class="story-line"></p>
+          <p id="result-record" class="record"></p>
+          <div class="actions stacked">
+            <button id="result-next" class="primary large" type="button" data-t="result.next">
+              Next level
+            </button>
+            <button id="result-retry" class="large" type="button" data-t="result.retry">
+              Try again
+            </button>
+            <button id="result-exit" class="ghost large" type="button"></button>
+          </div>
+        </div>
+      </section>
+
+
+      <div id="coach" class="coach-layer" hidden>
+        <div id="coach-rings" class="coach-rings" aria-hidden="true"></div>
+        <div
+          id="coach-bubble"
+          class="coach-bubble"
+          role="dialog"
+          aria-live="polite"
+          aria-labelledby="coach-text"
+        >
+          <canvas id="coach-portrait" class="portrait-canvas" aria-hidden="true"></canvas>
+          <div class="coach-body">
+            <p id="coach-speaker" class="coach-speaker"></p>
+            <p id="coach-text" class="coach-text"></p>
+            <div class="coach-actions">
+              <span id="coach-progress" class="coach-progress"></span>
+              <button id="coach-skip" class="ghost" type="button" data-t="coach.skip">
+                Skip tutorial
+              </button>
+              <button id="coach-next" class="primary" type="button"></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="dialogue" class="dialogue" role="status" aria-live="polite" hidden>
+        <canvas id="dialogue-portrait" class="portrait-canvas" aria-hidden="true"></canvas>
+        <div class="dialogue-body">
+          <p id="dialogue-speaker" class="coach-speaker"></p>
+          <p id="dialogue-text" class="dialogue-text"></p>
+        </div>
+      </div>
+
+      <div id="overlay-pause" class="overlay" hidden>
+        <div class="card menu-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+          <h2 id="pause-title" data-t="pause.title">Paused</h2>
+          <button id="pause-resume" class="primary large" type="button" data-t="pause.resume">
+            Resume
+          </button>
+          <button id="pause-restart" class="large" type="button" data-t="pause.restart">
+            Restart
+          </button>
+          <button id="pause-settings" class="large" type="button" data-t="pause.settings">
+            Settings
+          </button>
+          <button id="pause-quit" class="ghost large" type="button"></button>
+        </div>
+      </div>
+
+      <div id="overlay-settings" class="overlay" hidden>
+        <div
+          class="card settings-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-title"
+        >
+          <h2 id="settings-title" data-t="settings.title">Settings</h2>
+          <label class="field">
+            <span data-t="settings.sfx">Sound effects</span>
+            <input id="set-sfx" type="range" min="0" max="100" step="5" />
+          </label>
+          <label class="field">
+            <span data-t="settings.music">Music</span>
+            <input id="set-music" type="range" min="0" max="100" step="5" />
+          </label>
+          <label class="field">
+            <span data-t="settings.haptics">Vibration</span>
+            <input id="set-haptics" class="switch" type="checkbox" role="switch" />
+          </label>
+          <div class="field field-stack">
+            <span id="set-language-label" data-t="settings.language">Language</span>
+            <div
+              id="set-language"
+              class="segments"
+              role="group"
+              aria-labelledby="set-language-label"
+            ></div>
+          </div>
+          <button id="set-replay" class="ghost" type="button" data-t="coach.replay">
+            Replay tutorial
+          </button>
+          <div class="danger-zone">
+            <p id="set-reset-confirm" class="confirm" hidden></p>
+            <button id="set-reset" class="ghost" type="button" data-t="settings.resetProgress">
+              Reset progress
+            </button>
+          </div>
+          <div class="settings-foot">
+            <a
+              id="set-privacy"
+              class="repo"
+              href="./privacy.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-t="settings.privacy"
+              >Privacy policy</a
+            >
+            <span id="set-version" class="meta"></span>
+          </div>
+          <button id="set-close" class="primary large" type="button" data-t="settings.close">
+            Done
+          </button>
+        </div>
+      </div>
+
+      <div id="overlay-help" class="overlay" hidden>
+        <div class="card help-card" role="dialog" aria-modal="true" aria-labelledby="help-title">
+          <h2 id="help-title" data-t="help.title">How to play</h2>
+          <p class="lead" data-t="help.lead"></p>
+          <ol id="help-steps" class="steps"></ol>
+          <div class="legend">
+            <section aria-labelledby="legend-towers-title">
+              <h3 id="legend-towers-title" data-t="help.towers">Your towers</h3>
+              <ul id="legend-towers" class="legend-list"></ul>
+            </section>
+            <section aria-labelledby="legend-enemies-title">
+              <h3 id="legend-enemies-title" data-t="help.enemies">Enemies</h3>
+              <ul id="legend-enemies" class="legend-list"></ul>
+            </section>
+          </div>
+          <p class="keys" data-t="help.keys"></p>
+          <button id="help-close" class="primary large" type="button" data-t="help.close">
+            Got it
+          </button>
         </div>
       </div>
     </div>

@@ -1,4 +1,12 @@
-import type { EnemyDef, GameContent, MapDef, RulesDef, TowerDef, WaveDef } from "./content-types";
+import type {
+  EnemyDef,
+  GameContent,
+  MapDef,
+  PowerDef,
+  RulesDef,
+  TowerDef,
+  WaveDef,
+} from "./content-types";
 import { validateContent } from "./validate-content";
 
 export class InvalidContentError extends Error {
@@ -17,16 +25,26 @@ export class UnknownContentError extends Error {
 export class ContentRegistry {
   private readonly towersById: ReadonlyMap<string, TowerDef>;
   private readonly enemiesById: ReadonlyMap<string, EnemyDef>;
+  private readonly powersById: ReadonlyMap<string, PowerDef>;
 
   constructor(private readonly content: GameContent) {
     const problems = validateContent(content);
     if (problems.length > 0) throw new InvalidContentError(problems);
     this.towersById = new Map(content.towers.map((t) => [t.id, t]));
     this.enemiesById = new Map(content.enemies.map((e) => [e.id, e]));
+    this.powersById = new Map(content.powers.map((p) => [p.id, p]));
   }
 
   get towers(): readonly TowerDef[] {
     return this.content.towers;
+  }
+
+  get enemies(): readonly EnemyDef[] {
+    return this.content.enemies;
+  }
+
+  get powers(): readonly PowerDef[] {
+    return this.content.powers;
   }
 
   get waves(): readonly WaveDef[] {
@@ -45,6 +63,10 @@ export class ContentRegistry {
     return this.towersById.has(id);
   }
 
+  hasPower(id: string): boolean {
+    return this.powersById.has(id);
+  }
+
   tower(id: string): TowerDef {
     const tower = this.towersById.get(id);
     if (!tower) throw new UnknownContentError(`Unknown tower "${id}".`);
@@ -55,6 +77,12 @@ export class ContentRegistry {
     const enemy = this.enemiesById.get(id);
     if (!enemy) throw new UnknownContentError(`Unknown enemy "${id}".`);
     return enemy;
+  }
+
+  power(id: string): PowerDef {
+    const power = this.powersById.get(id);
+    if (!power) throw new UnknownContentError(`Unknown power "${id}".`);
+    return power;
   }
 
   wave(index: number): WaveDef {

@@ -2,6 +2,7 @@ import type { TargetingMode } from "../content-types";
 import type { Point } from "../geometry";
 import { distance } from "../geometry";
 import type { EnemyState } from "../state";
+import { canHit } from "../state";
 
 /** Chooses one enemy from those already known to be in range. */
 export type TargetingStrategy = (
@@ -41,6 +42,9 @@ export function enemiesInRange(
   enemies: readonly EnemyState[],
   origin: Point,
   range: number,
+  hitsAir = true,
 ): EnemyState[] {
-  return enemies.filter((e) => e.status === "alive" && distance(origin, e) <= range);
+  return enemies.filter(
+    (e) => e.status === "alive" && canHit(hitsAir, e) && distance(origin, e) <= range,
+  );
 }

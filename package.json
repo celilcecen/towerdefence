@@ -20,11 +20,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "balance": "vitest run tests/balance.test.ts",
+    "balance": "vitest run tests/balance.test.ts tests/campaign-balance.test.ts",
     "e2e": "playwright test",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run e2e"
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run e2e",
+    "assets:app": "node scripts/generate-app-assets.mjs",
+    "assets:store": "node scripts/store-screenshots.mjs"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.5.1",
@@ -36,5 +42,12 @@
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.0",
     "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3"
   }
 }

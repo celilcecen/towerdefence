@@ -1,23 +1,26 @@
-import type { GameSession } from "../app/session";
+import type { GameApp } from "../app/game-app";
 import type { CanvasRenderer } from "../render/renderer";
+import { POWER_KEYS } from "../ui/hud";
 
 /**
- * Pointer and keyboard bindings. Every gesture maps to a single session
- * method; no game rule is decided here. Returns a disposer.
+ * Pointer and keyboard bindings. Every gesture maps to a single app or
+ * session method; no game rule is decided here. Returns a disposer.
  */
 export function bindControls(
   canvas: HTMLCanvasElement,
   renderer: CanvasRenderer,
-  session: GameSession,
+  app: GameApp,
   keyTarget: Window,
 ): () => void {
   const controller = new AbortController();
   const { signal } = controller;
+  const { session } = app;
+  const playing = (): boolean => app.screen.kind === "game" && app.overlay === undefined;
 
   canvas.addEventListener(
     "pointermove",
     (event) => {
-      if (event.pointerType === "mouse")
+      if (event.pointerType === "mouse" && playing())
         session.setHover(renderer.cellAt(event.clientX, event.clientY));
     },
     { signal },
@@ -34,7 +37,7 @@ export function bindControls(
   canvas.addEventListener(
     "pointerdown",
     (event) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || !playing()) return;
       const cell = renderer.cellAt(event.clientX, event.clientY);
       session.setHover(cell);
       if (cell) session.activateCell(cell);
@@ -51,25 +54,35 @@ export function bindControls(
     { signal },
   );
 
-  const hotkeys = new Map(session.simulation.content.towers.map((t) => [t.hotkey, t.id]));
-
   keyTarget.addEventListener(
     "keydown",
     (event) => {
       if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement) return;
       // Let a focused button handle its own activation keys.
-      if (event.target instanceof HTMLButtonElement && (event.key === " " || event.key === "Enter"))
+      if (target instanceof HTMLButtonElement && (event.key === " " || event.key === "Enter"))
         return;
 
-      const tower = hotkeys.get(event.key);
-      if (tower) {
-        session.selectBuild(tower);
+      const key = event.key.toLowerCase();
+      if (key === "escape") {
+        if (playing() && session.selection.kind !== "none") session.cancel();
+        else app.back();
         return;
       }
-      switch (event.key.toLowerCase()) {
-        case "escape":
-          session.cancel();
-          break;
+      if (!playing()) return;
+
+      const tower = session.content.towers.find((t) => t.hotkey === event.key);
+      if (tower) {
+        session.selectBuild(tower.id);
+        return;
+      }
+      const power = session.content.powers[POWER_KEYS.indexOf(key)];
+      if (power) {
+        session.selectPower(power.id);
+        return;
+      }
+      switch (key) {
         case " ":
           event.preventDefault();
           session.startWave();
@@ -81,7 +94,7 @@ export function bindControls(
           session.sellSelected();
           break;
         case "p":
-          session.togglePause();
+          app.openOverlay("pause");
           break;
         case "f":
           session.cycleSpeed();

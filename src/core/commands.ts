@@ -1,6 +1,8 @@
+import { applyDamage, applySlow } from "./combat/damage";
 import type { TargetingMode } from "./content-types";
 import { TARGETING_MODES } from "./content-types";
 import { FlowField } from "./flow-field";
+import { distance } from "./geometry";
 import type { SimulationInternals } from "./internals";
 import type { PlacementError } from "./placement";
 import { checkPlacement } from "./placement";
@@ -17,7 +19,8 @@ export type Command =
   | { readonly type: "upgradeTower"; readonly towerId: number }
   | { readonly type: "sellTower"; readonly towerId: number }
   | { readonly type: "setTargeting"; readonly towerId: number; readonly mode: TargetingMode }
-  | { readonly type: "startWave" };
+  | { readonly type: "startWave" }
+  | { readonly type: "castPower"; readonly power: string; readonly x: number; readonly y: number };
 
 export type CommandType = Command["type"];
 
@@ -29,7 +32,11 @@ export type CommandError =
   | "insufficient-gold"
   | "max-level"
   | "invalid-targeting"
-  | "wave-in-progress";
+  | "wave-in-progress"
+  | "no-more-waves"
+  | "unknown-power"
+  | "power-not-ready"
+  | "no-wave-active";
 
 export type CommandResult =
   { readonly ok: true } | { readonly ok: false; readonly error: CommandError };
@@ -113,20 +120,66 @@ const setTargeting: Handler<Extract<Command, { type: "setTargeting" }>> = (sim, 
   return OK;
 };
 
+/**
+ * Starts the next wave. During a wave it calls the next one early, but only
+ * once the current waves have released every enemy, and pays part of the
+ * next wave's clear bonus up front for the risk.
+ */
 const startWave: Handler<Extract<Command, { type: "startWave" }>> = (sim) => {
   if (isOver(sim)) return fail("game-over");
-  if (sim.world.phase === "wave") return fail("wave-in-progress");
+  const { world, content } = sim;
+  const early = world.phase === "wave";
+  if (early && world.spawnQueue.length > 0) return fail("wave-in-progress");
+  if (world.wavesStarted >= content.waves.length) return fail("no-more-waves");
 
-  const wave = sim.content.wave(sim.world.wavesStarted);
-  sim.world.wavesStarted += 1;
-  sim.world.phase = "wave";
-  sim.world.spawnQueue = wave.groups.map((group) => ({
+  const wave = content.wave(world.wavesStarted);
+  const bonus = early ? Math.floor(wave.clearBonus * content.rules.earlyCallRatio) : 0;
+  world.wavesStarted += 1;
+  world.phase = "wave";
+  world.gold += bonus;
+  world.spawnQueue = wave.groups.map((group) => ({
     group,
     hpMultiplier: wave.hpMultiplier,
     spawned: 0,
     timer: group.delay,
   }));
-  sim.events.emit("waveStarted", { wave: sim.world.wavesStarted });
+  sim.events.emit("waveStarted", { wave: world.wavesStarted, early, bonus });
+  return OK;
+};
+
+const castPower: Handler<Extract<Command, { type: "castPower" }>> = (sim, command) => {
+  if (isOver(sim)) return fail("game-over");
+  const { world, content, grid } = sim;
+  const state = world.powers.find((p) => p.id === command.power);
+  if (!state || !content.hasPower(command.power)) return fail("unknown-power");
+  if (world.phase !== "wave") return fail("no-wave-active");
+  if (state.cooldown > 0) return fail("power-not-ready");
+
+  const power = content.power(command.power);
+  const { spec } = power;
+  let targets = 0;
+  switch (spec.kind) {
+    case "strike": {
+      const { x, y } = command;
+      if (!(Number.isFinite(x) && Number.isFinite(y))) return fail("out-of-bounds");
+      if (x < 0 || y < 0 || x > grid.width || y > grid.height) return fail("out-of-bounds");
+      for (const enemy of world.enemies) {
+        if (enemy.status !== "alive" || distance({ x, y }, enemy) > spec.radius) continue;
+        applyDamage(sim, enemy, spec.damage);
+        targets++;
+      }
+      break;
+    }
+    case "freeze":
+      for (const enemy of world.enemies) {
+        if (enemy.status !== "alive") continue;
+        applySlow(enemy, spec.slow);
+        targets++;
+      }
+      break;
+  }
+  state.cooldown = power.cooldown;
+  sim.events.emit("powerCast", { power, x: command.x, y: command.y, targets });
   return OK;
 };
 
@@ -138,4 +191,5 @@ export const COMMAND_HANDLERS: {
   sellTower,
   setTargeting,
   startWave,
+  castPower,
 };

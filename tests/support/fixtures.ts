@@ -55,8 +55,15 @@ export function makeContent(overrides: Partial<GameContent> = {}): GameContent {
     towers: [TEST_TOWER],
     enemies: [TEST_ENEMY],
     waves: [singleWave()],
+    powers: [],
     map: { id: "test", name: "Test", rows: ["S....E"] },
-    rules: { startingGold: 100, startingLives: 10, sellRefundRatio: 0.5, minDamageRatio: 0.2 },
+    rules: {
+      startingGold: 100,
+      startingLives: 10,
+      sellRefundRatio: 0.5,
+      minDamageRatio: 0.2,
+      earlyCallRatio: 0.5,
+    },
     ...overrides,
   };
 }
@@ -94,6 +101,7 @@ export function makeEnemy(overrides: Partial<EnemyState> = {}): EnemyState {
     remaining: 5,
     slowFactor: 1,
     slowTimer: 0,
+    abilityTimer: 0,
     status: "alive",
     ...overrides,
   };
@@ -108,10 +116,12 @@ export function makeTickContext(overrides: Partial<GameContent> = {}): TickConte
     lives: 10,
     phase: "wave",
     wavesStarted: 1,
+    wavesCleared: 0,
     enemies: [],
     towers: [],
     projectiles: [],
     spawnQueue: [],
+    powers: [],
     nextId: 100,
   };
   return {

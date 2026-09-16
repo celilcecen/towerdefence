@@ -12,8 +12,9 @@ export type PlacementCheck =
 /**
  * A tower may never seal the maze. Placement is simulated first: the flow
  * field is recomputed with the cell blocked and must still connect every
- * spawn, and every living enemy, to an exit. The computed field is returned
- * so a successful placement does not pay for the search twice.
+ * spawn, and every living ground enemy, to an exit. Flyers pass over towers,
+ * so they neither block a cell nor can be trapped. The computed field is
+ * returned so a successful placement does not pay for the search twice.
  */
 export function checkPlacement(
   sim: Pick<SimulationInternals, "grid" | "world">,
@@ -25,14 +26,14 @@ export function checkPlacement(
   if (!grid.isBuildable(x, y)) return { ok: false, error: "not-buildable" };
 
   const cell = { x, y };
-  const living = world.enemies.filter((e) => e.status === "alive");
-  if (living.some((e) => sameCell(cellOf(e), cell) || sameCell(e.waypoint, cell))) {
+  const walkers = world.enemies.filter((e) => e.status === "alive" && e.def.flying !== true);
+  if (walkers.some((e) => sameCell(cellOf(e), cell) || sameCell(e.waypoint, cell))) {
     return { ok: false, error: "occupied-by-enemy" };
   }
 
   const field = FlowField.compute(grid, cell);
   const sealsSpawn = grid.spawns.some((s) => !field.isReachable(s.x, s.y));
-  const trapsEnemy = living.some((e) => !field.isReachable(e.waypoint.x, e.waypoint.y));
+  const trapsEnemy = walkers.some((e) => !field.isReachable(e.waypoint.x, e.waypoint.y));
   if (sealsSpawn || trapsEnemy) return { ok: false, error: "blocks-path" };
 
   return { ok: true, field };

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Gridlock</string>
+    <string name="title_activity_main">Gridlock</string>
+    <string name="package_name">tr.com.yctechnologies.gridlock</string>
+    <string name="custom_url_scheme">tr.com.yctechnologies.gridlock</string>
+</resources>

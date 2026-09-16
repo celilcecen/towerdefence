@@ -56,6 +56,12 @@ export class TurretAim {
         const from = towerCenter(tower);
         this.fire(tower.id, Math.atan2(target.y - from.y, target.x - from.x));
       }),
+      events.on("chainFired", ({ tower, targets }) => {
+        const first = targets[0];
+        if (!first) return;
+        const from = towerCenter(tower);
+        this.fire(tower.id, Math.atan2(first.y - from.y, first.x - from.x));
+      }),
       events.on("pulseFired", ({ tower }) => {
         this.fire(tower.id, undefined);
       }),

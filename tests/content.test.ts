@@ -113,9 +113,15 @@ describe("validateContent", () => {
 
   it("reports invalid rules", () => {
     const problems = problemsFor({
-      rules: { startingGold: -1, startingLives: 0, sellRefundRatio: 2, minDamageRatio: 0 },
+      rules: {
+        startingGold: -1,
+        startingLives: 0,
+        sellRefundRatio: 2,
+        minDamageRatio: 0,
+        earlyCallRatio: 2,
+      },
     });
-    expect(problems).toHaveLength(4);
+    expect(problems).toHaveLength(5);
   });
 
   it("reports unparseable maps and spawns that cannot reach an exit", () => {

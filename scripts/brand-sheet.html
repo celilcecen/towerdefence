@@ -1,0 +1,38 @@
+<!doctype html>
+<!-- Renders the store icon and launch screen from the game's own brand art. Used only by generate-app-assets.mjs. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gridlock brand sheet</title>
+  </head>
+  <body>
+    <script type="module">
+      import { paintAppIcon, paintSplash } from "/src/render/art/brand.ts";
+
+      const render = (width, height, paint, type = "image/png") => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        paint(canvas.getContext("2d"));
+        return canvas.toDataURL(type, 0.92);
+      };
+
+      window.brand = {
+        icon: render(1024, 1024, (ctx) => paintAppIcon(ctx, 1024)),
+        // Android adaptive icons show only the middle two thirds of each layer, so the
+        // background carries the full art slightly zoomed out and the foreground stays empty.
+        adaptiveBackground: render(1024, 1024, (ctx) => {
+          ctx.fillStyle = "#0a0e13";
+          ctx.fillRect(0, 0, 1024, 1024);
+          const size = 1024 * 0.8;
+          ctx.translate((1024 - size) / 2, (1024 - size) / 2);
+          paintAppIcon(ctx, size);
+        }),
+        adaptiveForeground: render(1024, 1024, () => undefined),
+        splash: render(2732, 2732, (ctx) => paintSplash(ctx, 2732, 2732)),
+        // Google Play feature graphic: 1024 × 500, opaque, used by store-screenshots.mjs.
+        feature: render(1024, 500, (ctx) => paintSplash(ctx, 1024, 500), "image/jpeg"),
+      };
+    </script>
+  </body>
+</html>

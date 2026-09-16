@@ -9,7 +9,7 @@ const htmlSinks = ["innerHTML", "outerHTML"].map((property) => ({
 }));
 
 export default defineConfig(
-  { ignores: ["dist", "coverage", "playwright-report", "test-results"] },
+  { ignores: ["dist", "coverage", "playwright-report", "test-results", "android", "ios"] },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
@@ -59,6 +59,11 @@ export default defineConfig(
     },
   },
   {
+    // Translation tables are data: every formatter's signature is fixed by the English table's type.
+    files: ["src/i18n/**/*.ts"],
+    rules: { "@typescript-eslint/explicit-module-boundary-types": "off" },
+  },
+  {
     files: ["tests/**/*.ts", "e2e/**/*.ts"],
     rules: {
       "no-console": "off",
@@ -69,5 +74,12 @@ export default defineConfig(
     files: ["**/*.js"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // Build scripts are plain Node ES modules outside the TypeScript project.
+    files: ["scripts/**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node },
+    rules: { "no-console": "off" },
   },
 );

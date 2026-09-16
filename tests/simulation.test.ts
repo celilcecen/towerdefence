@@ -64,7 +64,13 @@ describe("enemy movement and leaks", () => {
 
   it("loses when lives run out and then stops changing", () => {
     const sim = makeSimulation({
-      rules: { startingGold: 0, startingLives: 1, sellRefundRatio: 0.5, minDamageRatio: 0.2 },
+      rules: {
+        startingGold: 0,
+        startingLives: 1,
+        sellRefundRatio: 0.5,
+        minDamageRatio: 0.2,
+        earlyCallRatio: 0.5,
+      },
     });
     const over = recordEvents(sim.events, "gameOver");
     sim.apply({ type: "startWave" });
@@ -194,6 +200,7 @@ describe("combat", () => {
       damage: 10,
       speed: 30,
       splashRadius: 0,
+      hitsAir: true,
       x: 0.5,
       y: 0.5,
       prevX: 0.5,

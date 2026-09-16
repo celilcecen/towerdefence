@@ -21,6 +21,8 @@ export interface EnemyState {
   remaining: number;
   slowFactor: number;
   slowTimer: number;
+  /** Seconds until the enemy's ability (such as a heal) triggers again. */
+  abilityTimer: number;
   status: EnemyStatus;
 }
 
@@ -43,6 +45,8 @@ export interface ProjectileState {
   readonly damage: number;
   readonly speed: number;
   readonly splashRadius: number;
+  /** False for shots from ground-only towers: they pass under flyers. */
+  readonly hitsAir: boolean;
   x: number;
   y: number;
   prevX: number;
@@ -61,16 +65,25 @@ export interface SpawnCursor {
   timer: number;
 }
 
+export interface PowerState {
+  readonly id: string;
+  /** Seconds until the power is ready. */
+  cooldown: number;
+}
+
 export interface WorldState {
   tick: number;
   gold: number;
   lives: number;
   phase: Phase;
   wavesStarted: number;
+  /** Waves whose enemies are all gone. Lags wavesStarted when waves are called early. */
+  wavesCleared: number;
   enemies: EnemyState[];
   towers: TowerState[];
   projectiles: ProjectileState[];
   spawnQueue: SpawnCursor[];
+  powers: PowerState[];
   nextId: number;
 }
 
@@ -81,9 +94,13 @@ export interface WorldView {
   readonly lives: number;
   readonly phase: Phase;
   readonly wavesStarted: number;
+  readonly wavesCleared: number;
   readonly enemies: readonly Readonly<EnemyState>[];
   readonly towers: readonly Readonly<TowerState>[];
   readonly projectiles: readonly Readonly<ProjectileState>[];
+  readonly powers: readonly Readonly<PowerState>[];
+  /** Enemies still to be released by the waves in progress. */
+  readonly spawnQueue: readonly Readonly<SpawnCursor>[];
 }
 
 export function towerCenter(tower: Pick<TowerState, "x" | "y">): Point {
@@ -102,4 +119,9 @@ export function nextLevel(tower: Pick<TowerState, "def" | "level">): TowerLevel 
 
 export function sellValue(tower: Pick<TowerState, "invested">, refundRatio: number): number {
   return Math.floor(tower.invested * refundRatio);
+}
+
+/** Flyers are only visible to towers and shots that can hit air. */
+export function canHit(hitsAir: boolean, enemy: Pick<EnemyState, "def">): boolean {
+  return hitsAir || enemy.def.flying !== true;
 }

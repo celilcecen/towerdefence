@@ -1,6 +1,6 @@
 import { darken, lighten, withAlpha } from "../color";
 import { PALETTE, towerColor } from "../palette";
-import { circle, linear, polygon, radial, TAU } from "./common";
+import { circle, hash, linear, polygon, radial, TAU } from "./common";
 
 /** Turrets are drawn larger than their base plate so barrels read at small cell sizes. */
 export const TURRET_SCALE = 1.25;
@@ -251,6 +251,186 @@ const spireTurret: LevelPainter = (ctx, s, level) => {
   ctx.fill();
 };
 
+/** A Tesla coil seen from above: copper windings, a steel toroid and spark prongs. */
+const arcTurret: LevelPainter = (ctx, s, level) => {
+  const color = towerColor("arc");
+  const spark = lighten(color, 0.55);
+  const prongs = level === 2 ? 6 : level + 3;
+  const reach = s * (0.36 + level * 0.025);
+  const ring = s * (0.19 + level * 0.015);
+
+  circle(ctx, 0, 0, reach * 1.08);
+  ctx.fillStyle = radial(ctx, 0, 0, reach * 1.08, [
+    [0, withAlpha(color, 0.35)],
+    [1, withAlpha(color, 0)],
+  ]);
+  ctx.fill();
+
+  const tips: [number, number][] = [];
+  for (let i = 0; i < prongs; i++) {
+    const angle = (i / prongs) * TAU;
+    tips.push([Math.cos(angle) * reach, Math.sin(angle) * reach]);
+    ctx.save();
+    ctx.rotate(angle);
+    barrel(ctx, ring * 0.7, reach - s * 0.03, 0, s * 0.045, "#cbd5e1", "#3f4a5a");
+    ctx.restore();
+  }
+
+  // Standing arcs crackle across alternate gaps between prong tips.
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (let i = 0; i < prongs; i += 2) {
+    const from = tips[i];
+    const to = tips[(i + 1) % prongs];
+    if (!from || !to) continue;
+    ctx.beginPath();
+    ctx.moveTo(from[0], from[1]);
+    const steps = 4;
+    for (let k = 1; k < steps; k++) {
+      const f = k / steps;
+      const bulge = 1.12 + (hash(level, i, k) - 0.5) * 0.3;
+      ctx.lineTo(
+        (from[0] + (to[0] - from[0]) * f) * bulge,
+        (from[1] + (to[1] - from[1]) * f) * bulge,
+      );
+    }
+    ctx.lineTo(to[0], to[1]);
+    ctx.strokeStyle = withAlpha(color, 0.45);
+    ctx.lineWidth = Math.max(1.5, s * 0.05);
+    ctx.stroke();
+    ctx.strokeStyle = spark;
+    ctx.lineWidth = Math.max(1, s * 0.016);
+    ctx.stroke();
+  }
+  for (const [x, y] of tips) {
+    circle(ctx, x, y, s * 0.05);
+    ctx.fillStyle = radial(ctx, x, y, s * 0.05, [
+      [0, "#ffffff"],
+      [0.5, spark],
+      [1, color],
+    ]);
+    ctx.fill();
+  }
+
+  circle(ctx, 0, 0, ring * 0.8);
+  ctx.fillStyle = "#3a2618";
+  ctx.fill();
+  ctx.strokeStyle = "#c2773a";
+  ctx.lineWidth = Math.max(1, s * 0.012);
+  for (let k = 1; k <= 3; k++) {
+    circle(ctx, 0, 0, ring * 0.8 * (k / 3.4));
+    ctx.stroke();
+  }
+
+  circle(ctx, 0, 0, ring);
+  ctx.strokeStyle = linear(ctx, -ring, -ring, ring, ring, [
+    [0, "#e2e8f0"],
+    [0.5, "#64748b"],
+    [1, "#1e293b"],
+  ]);
+  ctx.lineWidth = Math.max(2, s * (0.075 + level * 0.01));
+  ctx.stroke();
+  ctx.strokeStyle = withAlpha(color, 0.8);
+  ctx.lineWidth = Math.max(1, s * 0.014);
+  ctx.stroke();
+  if (level >= 1) {
+    circle(ctx, 0, 0, ring * 1.45);
+    ctx.setLineDash([s * 0.035, s * 0.03]);
+    ctx.strokeStyle = withAlpha(spark, 0.6);
+    ctx.lineWidth = Math.max(1, s * 0.014);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  circle(ctx, 0, 0, s * 0.075);
+  ctx.fillStyle = radial(ctx, 0, 0, s * 0.075, [
+    [0, "#ffffff"],
+    [0.45, spark],
+    [1, color],
+  ]);
+  ctx.fill();
+};
+
+/** A squat bronze mortar on a turntable, its wide bore tilted towards the target. */
+const mortarTurret: LevelPainter = (ctx, s, level) => {
+  const color = towerColor("mortar");
+  const r = s * (0.23 + level * 0.015);
+  metalBody(ctx, r, darken(color, 0.3), Math.max(1, s * 0.03));
+  ctx.fillStyle = "#d6d3d1";
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * TAU + TAU / 16;
+    circle(ctx, Math.cos(angle) * r * 0.8, Math.sin(angle) * r * 0.8, s * 0.016);
+    ctx.fill();
+  }
+
+  for (const side of [-1, 1]) {
+    ctx.fillStyle = linear(ctx, 0, side * r * 0.5, 0, side * r * 1.05, [
+      [0, "#1f2937"],
+      [0.5, "#6b7280"],
+      [1, "#1f2937"],
+    ]);
+    ctx.fillRect(-s * 0.05, side > 0 ? r * 0.5 : -r * 1.02, s * 0.12, r * 0.52);
+  }
+
+  // The tube widens towards the muzzle: it points up as well as forward.
+  const back = -s * 0.1;
+  const front = s * (0.3 + level * 0.02);
+  const rear = s * (0.1 + level * 0.012);
+  const mouth = s * (0.135 + level * 0.018);
+  ctx.beginPath();
+  ctx.moveTo(back, -rear);
+  ctx.lineTo(front, -mouth);
+  ctx.lineTo(front, mouth);
+  ctx.lineTo(back, rear);
+  ctx.quadraticCurveTo(back - rear * 0.8, 0, back, -rear);
+  ctx.closePath();
+  ctx.fillStyle = linear(ctx, 0, -mouth, 0, mouth, [
+    [0, darken(color, 0.55)],
+    [0.3, color],
+    [0.45, lighten(color, 0.45)],
+    [0.65, color],
+    [1, darken(color, 0.6)],
+  ]);
+  ctx.fill();
+  ctx.strokeStyle = darken(color, 0.65);
+  ctx.lineWidth = Math.max(1, s * 0.018);
+  ctx.stroke();
+
+  const bands = level === 0 ? [] : level === 1 ? [0.45] : [0.2, 0.62];
+  for (const f of bands) {
+    const bx = back + (front - back) * f;
+    const half = rear + (mouth - rear) * f + s * 0.012;
+    ctx.fillStyle = linear(ctx, 0, -half, 0, half, [
+      [0, darken(color, 0.5)],
+      [0.45, lighten(color, 0.3)],
+      [1, darken(color, 0.55)],
+    ]);
+    ctx.fillRect(bx - s * 0.02, -half, s * 0.04, half * 2);
+  }
+
+  ctx.beginPath();
+  ctx.ellipse(front, 0, mouth * 0.45, mouth * 1.08, 0, 0, TAU);
+  ctx.fillStyle = linear(ctx, front, -mouth, front, mouth, [
+    [0, lighten(color, 0.35)],
+    [1, darken(color, 0.45)],
+  ]);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(front, 0, mouth * 0.3, mouth * 0.78, 0, 0, TAU);
+  ctx.fillStyle = radial(ctx, front, 0, mouth * 0.78, [
+    [0, "#000000"],
+    [1, "#1c1917"],
+  ]);
+  ctx.fill();
+  if (level >= 2) {
+    ctx.fillStyle = lighten(color, 0.5);
+    for (const side of [-1, 1]) {
+      circle(ctx, front, side * mouth * 0.95, s * 0.018);
+      ctx.fill();
+    }
+  }
+};
+
 const genericTurret =
   (id: string): LevelPainter =>
   (ctx, s, level) => {
@@ -264,6 +444,8 @@ const ART: Readonly<Record<string, TowerArt>> = {
   cannon: { base: platform(0, 0, "cannon"), turret: cannonTurret, motion: "aim" },
   frost: { base: platform(6, 0, "frost"), turret: frostTurret, motion: "spin" },
   spire: { base: platform(4, TAU / 8, "spire"), turret: spireTurret, motion: "aim" },
+  arc: { base: platform(5, -TAU / 4, "arc"), turret: arcTurret, motion: "spin" },
+  mortar: { base: platform(4, 0, "mortar"), turret: mortarTurret, motion: "aim" },
 };
 
 /** Artwork for a tower id. Unknown ids get a plain turret in the fallback colour. */

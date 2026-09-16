@@ -10,10 +10,14 @@ import { computeLayout, screenAngle } from "../src/render/layout";
 import { angleDelta, enemyHeading, RECOIL_MS, TURN_MS, TurretAim } from "../src/render/motion";
 import type { SpriteSurface } from "../src/render/sprite-cache";
 import { SpriteCache } from "../src/render/sprite-cache";
+import { en } from "../src/i18n/en";
+import { tr } from "../src/i18n/tr";
 import {
   describeAttack,
   describeLevel,
   enemyProfile,
+  lookupText,
+  rosterOf,
   towerRole,
   waveRoster,
 } from "../src/ui/describe";
@@ -206,39 +210,51 @@ describe("player-facing descriptions", () => {
     ...TEST_TOWER,
     levels: [{ cost: 10, range, cooldown, attack }],
   });
+  const CLASSIC_ROSTER = ENEMIES.filter((e) =>
+    ["runner", "grunt", "brute", "warden"].includes(e.id),
+  );
 
   it("describes every attack kind and level", () => {
-    expect(describeAttack({ kind: "projectile", damage: 9, speed: 1, splashRadius: 0 })).toBe(
+    expect(describeAttack(en, { kind: "projectile", damage: 9, speed: 1, splashRadius: 0 })).toBe(
       "9 dmg",
     );
-    expect(describeAttack({ kind: "projectile", damage: 20, speed: 1, splashRadius: 1 })).toBe(
+    expect(describeAttack(en, { kind: "projectile", damage: 20, speed: 1, splashRadius: 1 })).toBe(
       "20 splash",
     );
-    expect(describeAttack({ kind: "beam", damage: 55 })).toBe("55 beam");
-    expect(describeAttack({ kind: "pulse", damage: 4, slow: { factor: 0.55, duration: 1 } })).toBe(
-      "4 dmg, slow 45%",
+    expect(describeAttack(en, { kind: "beam", damage: 55 })).toBe("55 beam");
+    expect(
+      describeAttack(en, { kind: "pulse", damage: 4, slow: { factor: 0.55, duration: 1 } }),
+    ).toBe("4 dmg, slow 45%");
+    expect(
+      describeAttack(en, { kind: "chain", damage: 18, jumps: 3, jumpRange: 1, falloff: 0.8 }),
+    ).toBe("18 dmg, jumps 3");
+    expect(describeLevel(en, TOWERS[0]!.levels[0])).toBe("9 dmg · range 2.6 · 1.8/s");
+    expect(describeLevel(tr, TOWERS[0]!.levels[0], { groundOnly: true })).toBe(
+      "9 hasar · menzil 2.6 · 1.8/sn · yalnız kara",
     );
-    expect(describeLevel(TOWERS[0]!.levels[0])).toBe("9 dmg · range 2.6 · 1.8/s");
   });
 
   it("gives each tower a role from its data", () => {
-    expect(TOWERS.map(towerRole)).toEqual([
+    expect(TOWERS.map((tower) => towerRole(en, tower))).toEqual([
       "Rapid fire",
       "Area damage",
       "Slows nearby",
       "Long range, pierces armor",
+      "Chains between enemies",
+      "Long-range artillery",
     ]);
     expect(
-      towerRole(withAttack({ kind: "projectile", damage: 1, speed: 1, splashRadius: 0 })),
+      towerRole(en, withAttack({ kind: "projectile", damage: 1, speed: 1, splashRadius: 0 })),
     ).toBe("Single target");
-    expect(towerRole(withAttack({ kind: "beam", damage: 1 }))).toBe("Pierces armor");
+    expect(towerRole(en, withAttack({ kind: "beam", damage: 1 }))).toBe("Pierces armor");
   });
 
   it("profiles enemies relative to the roster", () => {
-    const profile = (id: string) =>
+    const profile = (id: string, roster: typeof ENEMIES = CLASSIC_ROSTER) =>
       enemyProfile(
+        en,
         ENEMIES.find((e) => e.id === id)!,
-        ENEMIES,
+        roster,
       );
     expect(profile("runner").traits).toEqual(["Fast", "−1 life"]);
     expect(profile("grunt").traits).toEqual(["Basic", "−1 life"]);
@@ -247,7 +263,10 @@ describe("player-facing descriptions", () => {
       traits: ["Boss", "Slow", "Armored", "−20 lives"],
       boss: true,
     });
-    expect(enemyProfile(ENEMIES[0]!, []).boss).toBe(false);
+    expect(profile("wisp", ENEMIES).traits).toContain("Flies over walls");
+    expect(profile("mender", ENEMIES).traits).toContain("Heals allies");
+    expect(profile("brood", ENEMIES).traits).toContain("Splits on death");
+    expect(enemyProfile(tr, ENEMIES[0]!, []).boss).toBe(false);
   });
 
   it("merges a wave's groups by enemy in order of arrival", () => {
@@ -265,5 +284,32 @@ describe("player-facing descriptions", () => {
       { enemy: "grunt", count: 14 },
       { enemy: "brute", count: 3 },
     ]);
+  });
+
+  it("lists every enemy a set of waves can put on the board, splitters' children included", () => {
+    const byId = (id: string) => ENEMIES.find((e) => e.id === id)!;
+    const roster = rosterOf(
+      [
+        {
+          hpMultiplier: 1,
+          clearBonus: 0,
+          groups: [{ enemy: "brood", count: 1, interval: 0, delay: 0 }],
+        },
+        {
+          hpMultiplier: 1,
+          clearBonus: 0,
+          groups: [{ enemy: "brood", count: 2, interval: 0, delay: 0 }],
+        },
+      ],
+      byId,
+    );
+    expect(roster.map((e) => e.id)).toEqual(["brood", "broodling"]);
+  });
+
+  it("resolves dotted translation keys to strings only", () => {
+    expect(lookupText(en, "home.campaign")).toBe("Campaign");
+    expect(lookupText(tr, "home.campaign")).toBe("Hikâye");
+    expect(lookupText(en, "home.stars")).toBeUndefined();
+    expect(lookupText(en, "home.nope.deeper")).toBeUndefined();
   });
 });

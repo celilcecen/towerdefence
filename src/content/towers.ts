@@ -31,9 +31,10 @@ export const TOWERS: readonly TowerDef[] = [
   {
     id: "cannon",
     name: "Cannon",
-    summary: "Slow shells that damage everything they land on.",
+    summary: "Slow shells that damage everything they land on. Cannot hit flyers.",
     hotkey: "2",
     defaultTargeting: "first",
+    groundOnly: true,
     levels: [
       {
         cost: 90,
@@ -92,6 +93,61 @@ export const TOWERS: readonly TowerDef[] = [
       { cost: 140, range: 4.2, cooldown: 1.6, attack: { kind: "beam", damage: 55 } },
       { cost: 130, range: 4.5, cooldown: 1.5, attack: { kind: "beam", damage: 100 } },
       { cost: 220, range: 4.8, cooldown: 1.4, attack: { kind: "beam", damage: 180 } },
+    ],
+  },
+  {
+    id: "arc",
+    name: "Arc",
+    summary: "Lightning that jumps between packed enemies.",
+    hotkey: "5",
+    defaultTargeting: "first",
+    levels: [
+      {
+        cost: 110,
+        range: 2.6,
+        cooldown: 1.1,
+        attack: { kind: "chain", damage: 18, jumps: 3, jumpRange: 1.6, falloff: 0.8 },
+      },
+      {
+        cost: 95,
+        range: 2.8,
+        cooldown: 1,
+        attack: { kind: "chain", damage: 30, jumps: 4, jumpRange: 1.7, falloff: 0.8 },
+      },
+      {
+        cost: 170,
+        range: 3,
+        cooldown: 0.9,
+        attack: { kind: "chain", damage: 50, jumps: 5, jumpRange: 1.8, falloff: 0.85 },
+      },
+    ],
+  },
+  {
+    id: "mortar",
+    name: "Mortar",
+    summary: "Lobs heavy shells across the whole field. Cannot hit flyers.",
+    hotkey: "6",
+    defaultTargeting: "strongest",
+    groundOnly: true,
+    levels: [
+      {
+        cost: 160,
+        range: 5.5,
+        cooldown: 3.2,
+        attack: { kind: "projectile", damage: 60, speed: 5, splashRadius: 1.4 },
+      },
+      {
+        cost: 140,
+        range: 5.8,
+        cooldown: 3,
+        attack: { kind: "projectile", damage: 105, speed: 5.5, splashRadius: 1.5 },
+      },
+      {
+        cost: 230,
+        range: 6.2,
+        cooldown: 2.8,
+        attack: { kind: "projectile", damage: 180, speed: 6, splashRadius: 1.7 },
+      },
     ],
   },
 ];

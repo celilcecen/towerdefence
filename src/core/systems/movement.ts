@@ -7,13 +7,16 @@ import type { System, TickContext } from "../tick";
 function remainingDistance(enemy: EnemyState, flow: FlowField): number {
   const target = cellCenter(enemy.waypoint);
   const toWaypoint = Math.hypot(target.x - enemy.x, target.y - enemy.y);
-  return flow.distanceAt(enemy.waypoint.x, enemy.waypoint.y) + toWaypoint;
+  return enemy.def.flying
+    ? toWaypoint
+    : flow.distanceAt(enemy.waypoint.x, enemy.waypoint.y) + toWaypoint;
 }
 
 /**
- * Walks enemies from cell centre to cell centre along the flow field. Unused
- * movement budget carries over to the next waypoint, so speed is exact and
- * independent of how cell boundaries fall on tick boundaries.
+ * Walks ground enemies from cell centre to cell centre along the flow field.
+ * Unused movement budget carries over to the next waypoint, so speed is exact
+ * and independent of how cell boundaries fall on tick boundaries. Flyers
+ * ignore the maze: their waypoint is the exit itself.
  */
 export class EnemyMovementSystem implements System {
   readonly name = "movement";
@@ -43,6 +46,10 @@ export class EnemyMovementSystem implements System {
         enemy.y = target.y;
         budget -= gap;
 
+        if (enemy.def.flying) {
+          enemy.status = "leaked";
+          break;
+        }
         const next = ctx.flow.nextStep(enemy.waypoint.x, enemy.waypoint.y);
         if (!next) {
           if (ctx.flow.distanceAt(enemy.waypoint.x, enemy.waypoint.y) === 0) {

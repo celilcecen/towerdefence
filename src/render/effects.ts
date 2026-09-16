@@ -1,8 +1,9 @@
 import type { EventBus } from "../core/events";
 import type { GameEvents } from "../core/game-events";
 import type { Cell } from "../core/geometry";
-import { towerCenter } from "../core/state";
+import { HERO_ID, towerCenter } from "../core/state";
 import { hash, TAU } from "./art/common";
+import { paintHeroPillar } from "./art/hero";
 import { METEOR_FIRE, paintMeteor } from "./art/powers";
 import type { Region } from "./clusters";
 import { clusterRegions } from "./clusters";
@@ -55,6 +56,10 @@ type Effect = Timed &
     | { readonly kind: "snow"; readonly count: number; readonly seed: number }
     /** Text over every exit gate; (x, y) is ignored. */
     | { readonly kind: "exitText"; readonly text: string; readonly color: string }
+    /** A straight streak of light from (x, y) to (x2, y2), brightest at the far end. */
+    | { readonly kind: "streak"; readonly x2: number; readonly y2: number; readonly color: string }
+    /** A column of light rising from (x, y). */
+    | { readonly kind: "pillar" }
   );
 
 export type Project = (x: number, y: number) => { x: number; y: number };
@@ -108,6 +113,10 @@ export const BOSS_ARRIVAL_MS = 900;
 export const HERO_HURT_MS = 360;
 /** Milliseconds a dash leaves afterimages behind the hero. */
 export const DASH_TRAIL_MS = 300;
+/** Milliseconds the hero's spear kicks back after a shot. */
+export const HERO_RECOIL_MS = 150;
+/** Milliseconds the board is washed with light after a nova. */
+export const NOVA_FLASH_MS = 280;
 
 /** A dash in progress or just finished: where it began, which way it went, and how far along. */
 export interface DashTrail {
@@ -158,6 +167,8 @@ export class Effects {
   }[] = [];
   private hurtAt = Number.NEGATIVE_INFINITY;
   private heroHurtAt = Number.NEGATIVE_INFINITY;
+  private heroFiredAt = Number.NEGATIVE_INFINITY;
+  private novaAt = Number.NEGATIVE_INFINITY;
   private freezeAt = Number.NEGATIVE_INFINITY;
   private bossAt = Number.NEGATIVE_INFINITY;
   private dashes: {
@@ -195,14 +206,15 @@ export class Effects {
       events.on("projectileFired", ({ projectile }) => {
         const angle = Math.atan2(projectile.aimY - projectile.y, projectile.aimX - projectile.x);
         const heavy = projectile.splashRadius > 0;
+        const hero = projectile.towerId === HERO_ID;
         add({
           kind: "flash",
           x: projectile.x + Math.cos(angle) * MUZZLE_REACH,
           y: projectile.y + Math.sin(angle) * MUZZLE_REACH,
-          radius: heavy ? 0.3 : 0.18,
-          color: heavy ? "#fbbf24" : "#ecfccb",
+          radius: heavy ? 0.3 : hero ? 0.24 : 0.18,
+          color: heavy ? "#fbbf24" : hero ? lighten(HERO_COLOR, 0.45) : "#ecfccb",
           start: now(),
-          duration: heavy ? 140 : 90,
+          duration: heavy ? 140 : hero ? 110 : 90,
         });
       }),
       events.on("beamFired", ({ tower, target }) => {
@@ -418,15 +430,39 @@ export class Effects {
       events.on("heroHurt", () => {
         this.heroHurtAt = now();
       }),
+      events.on("heroFired", () => {
+        this.heroFiredAt = now();
+      }),
       events.on("heroDashed", ({ hero, dx, dy }) => {
         if (!this.reducedMotion) this.dashes.push({ x: hero.x, y: hero.y, dx, dy, start: now() });
-        burst(hero.x, hero.y, 0.5, withAlpha(HERO_COLOR, 0.8), 6, 260);
+        const reach = hero.def.dash.distance;
+        add({
+          kind: "streak",
+          x: hero.x,
+          y: hero.y,
+          x2: hero.x + dx * reach,
+          y2: hero.y + dy * reach,
+          color: HERO_COLOR,
+          start: now(),
+          duration: 300,
+        });
+        add({
+          kind: "flash",
+          x: hero.x,
+          y: hero.y,
+          radius: 0.5,
+          color: lighten(HERO_COLOR, 0.4),
+          start: now(),
+          duration: 160,
+        });
+        burst(hero.x, hero.y, 0.6, withAlpha(HERO_COLOR, 0.85), 9, 320);
       }),
       events.on("heroDowned", ({ hero }) => {
         this.heroHurtAt = now();
-        this.kick(0.1, 360);
-        burst(hero.x, hero.y, 0.8, "#94a3b8", 12, 520);
-        burst(hero.x, hero.y, 0.6, HERO_COLOR, 8, 420);
+        this.kick(0.14, 420);
+        burst(hero.x, hero.y, 0.9, "#94a3b8", 14, 560);
+        burst(hero.x, hero.y, 0.7, HERO_COLOR, 10, 460);
+        burst(hero.x, hero.y, 0.5, HERO_GOLD, 6, 400);
         add({
           kind: "ring",
           x: hero.x,
@@ -439,6 +475,7 @@ export class Effects {
         });
       }),
       events.on("heroRespawned", ({ hero }) => {
+        add({ kind: "pillar", x: hero.x, y: hero.y, start: now(), duration: 900 });
         add({
           kind: "ring",
           x: hero.x,
@@ -452,7 +489,18 @@ export class Effects {
         burst(hero.x, hero.y, 0.8, lighten(HERO_COLOR, 0.4), 12, 520);
       }),
       events.on("heroNova", ({ hero, radius }) => {
-        this.kick(0.2, 420);
+        this.novaAt = now();
+        this.kick(0.3, 460);
+        add({
+          kind: "ring",
+          x: hero.x,
+          y: hero.y,
+          radius: radius * 1.25,
+          color: lighten(HERO_COLOR, 0.5),
+          filled: false,
+          start: now() + 140,
+          duration: 640,
+        });
         add({
           kind: "ring",
           x: hero.x,
@@ -484,6 +532,7 @@ export class Effects {
         });
         burst(hero.x, hero.y, radius, lighten(HERO_COLOR, 0.3), 18, 620);
         burst(hero.x, hero.y, radius * 0.7, HERO_GOLD, 10, 520);
+        burst(hero.x, hero.y, radius * 1.3, "#ffffff", 14, 720);
       }),
       events.on("waveStarted", ({ early, bonus }) => {
         if (!early || bonus <= 0) return;
@@ -582,9 +631,24 @@ export class Effects {
     this.shakes = [];
     this.hurtAt = Number.NEGATIVE_INFINITY;
     this.heroHurtAt = Number.NEGATIVE_INFINITY;
+    this.heroFiredAt = Number.NEGATIVE_INFINITY;
+    this.novaAt = Number.NEGATIVE_INFINITY;
     this.freezeAt = Number.NEGATIVE_INFINITY;
     this.bossAt = Number.NEGATIVE_INFINITY;
     this.dashes = [];
+  }
+
+  /** 1 the instant the hero fires, fading to 0 over HERO_RECOIL_MS. Always 0 under reduced motion. */
+  heroRecoil(now: number): number {
+    if (this.reducedMotion) return 0;
+    const t = (now - this.heroFiredAt) / HERO_RECOIL_MS;
+    return t < 0 || t >= 1 ? 0 : 1 - t;
+  }
+
+  /** Strength in [0, 1] of the board-wide wash of light just after a nova. */
+  novaFlash(now: number): number {
+    const t = (now - this.novaAt) / NOVA_FLASH_MS;
+    return t < 0 || t >= 1 ? 0 : 1 - easeOut(t);
   }
 
   /** 1 the instant the hero is hurt, fading to 0 over HERO_HURT_MS. */
@@ -973,6 +1037,29 @@ export class Effects {
         }
         break;
       }
+      case "streak": {
+        const q = project(effect.x2, effect.y2);
+        const fade = 1 - easeOut(t);
+        ctx.globalAlpha = fade;
+        ctx.lineCap = "round";
+        const gradient = ctx.createLinearGradient(p.x, p.y, q.x, q.y);
+        gradient.addColorStop(0, withAlpha(effect.color, 0));
+        gradient.addColorStop(1, withAlpha(lighten(effect.color, 0.4), 0.9));
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = Math.max(2, s * 0.34 * fade);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(q.x, q.y);
+        ctx.stroke();
+        ctx.strokeStyle = withAlpha("#ffffff", 0.8 * fade);
+        ctx.lineWidth = Math.max(1, s * 0.06);
+        ctx.stroke();
+        break;
+      }
+      case "pillar":
+        ctx.globalAlpha = 1;
+        paintHeroPillar(ctx, p.x, p.y, s, this.reducedMotion ? 0.5 : t);
+        break;
       case "text":
         this.drawText(ctx, p.x, p.y, s, t, effect.text, effect.color, 1);
         break;

@@ -7,7 +7,16 @@ import type { EnemyState, HeroState, TowerState } from "../core/state";
 import { currentLevel, HERO_ID, towerCenter } from "../core/state";
 import { circle, radial, TAU } from "./art/common";
 import { enemyArt, FLAP_FRAMES, paintFeet } from "./art/enemies";
-import { HERO_EXTENT, paintHero, paintHeroAura, paintHeroBolt, paintHeroShadow } from "./art/hero";
+import {
+  HERO_EXTENT,
+  HERO_FRAMES,
+  paintHero,
+  paintHeroAura,
+  paintHeroBolt,
+  paintHeroOrbit,
+  paintHeroShadow,
+  paintHeroSigil,
+} from "./art/hero";
 import { paintDart, paintMortarShell, paintShell } from "./art/projectiles";
 import type { TerrainTheme } from "./art/terrain";
 import {
@@ -73,6 +82,8 @@ const DANGER_COLOR = "#ef4444";
 const HURT_COLOR = "#f43f5e";
 /** Afterimages drawn behind a dashing hero. */
 const DASH_GHOSTS = 3;
+/** The hero's drawn size relative to its collision radius. */
+const HERO_SCALE = 1.2;
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
@@ -196,6 +207,7 @@ export class CanvasRenderer {
       );
     }
     this.drawFreeze(frame, board);
+    this.drawNovaFlash(frame, board);
     this.drawBossShadow(frame, board);
     this.drawDanger(frame, board);
     this.drawHeroHurt(frame, board);
@@ -708,42 +720,53 @@ export class CanvasRenderer {
     if (!hero) return;
     const { ctx } = this;
     const size = this.layout.cellSize;
-    const r = hero.def.radius * size;
+    // Drawn a little larger than its collision circle so it reads at phone size.
+    const r = hero.def.radius * size * HERO_SCALE;
+    const still = frame.reducedMotion;
     const p = this.point(
       lerp(hero.prevX, hero.x, frame.alpha),
       lerp(hero.prevY, hero.y, frame.alpha),
     );
     const heading = screenAngle(this.layout, hero.facing);
-    const key = `hero:${hero.def.id}`;
     const extent = hero.def.radius * HERO_EXTENT;
+    const moving = hero.moveX !== 0 || hero.moveY !== 0 || hero.dashTimer > 0;
+    // The cloak ripples quickly on the move and slowly at rest; each pose is its own sprite.
+    const pose = still ? 0 : Math.floor(frame.now / (moving ? 90 : 320)) % HERO_FRAMES;
+    const key = `hero:${hero.def.id}:${pose}`;
     const paint = (g: CanvasRenderingContext2D, cell: number): void => {
-      paintHero(g, hero.def.radius * cell);
+      paintHero(g, hero.def.radius * cell, pose);
     };
+    const pulse = still ? 0.5 : 0.5 + 0.5 * Math.sin(frame.now / 240);
 
     if (hero.status === "down") {
       paintHeroShadow(ctx, p.x, p.y, r * 0.8);
+      const wake = 1 - hero.respawnTimer / hero.def.respawn;
+      // The light gathers again as the return draws near.
+      paintHeroAura(ctx, p.x, p.y, r * 0.8, 0, wake * wake);
       ctx.save();
-      ctx.globalAlpha = 0.4;
+      ctx.globalAlpha = 0.35 + wake * 0.2;
       this.sprites.draw(ctx, key, extent, paint, p.x, p.y, heading + Math.PI / 2);
       ctx.restore();
-      const share = 1 - hero.respawnTimer / hero.def.respawn;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r * 1.5, -Math.PI / 2, -Math.PI / 2 + TAU * share);
-      ctx.strokeStyle = withAlpha(HERO_COLOR, 0.9);
-      ctx.lineWidth = Math.max(2, size * 0.07);
       ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.6, -Math.PI / 2, -Math.PI / 2 + TAU * wake);
+      ctx.strokeStyle = withAlpha(HERO_COLOR, 0.25);
+      ctx.lineWidth = Math.max(5, size * 0.18);
+      ctx.stroke();
+      ctx.strokeStyle = withAlpha(HERO_COLOR, 0.95);
+      ctx.lineWidth = Math.max(2, size * 0.07);
       ctx.stroke();
       return;
     }
 
-    if (!frame.reducedMotion) {
+    if (!still) {
       for (const trail of frame.effects.dashTrails(frame.now)) {
         for (let i = 1; i <= DASH_GHOSTS; i++) {
           const f = Math.max(0, trail.t - i * 0.14);
           const reach = hero.def.dash.distance * f;
           const g = this.point(trail.x + trail.dx * reach, trail.y + trail.dy * reach);
           ctx.save();
-          ctx.globalAlpha = (1 - trail.t) * 0.3 * (1 - (i - 1) / DASH_GHOSTS);
+          ctx.globalAlpha = (1 - trail.t) * 0.35 * (1 - (i - 1) / DASH_GHOSTS);
           this.sprites.draw(ctx, key, extent, paint, g.x, g.y, heading);
           ctx.restore();
         }
@@ -751,35 +774,94 @@ export class CanvasRenderer {
     }
 
     paintHeroShadow(ctx, p.x, p.y, r);
-    const pulse = frame.reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(frame.now / 240);
+    const spin = still ? 0 : (frame.now / 2600) * TAU;
+    paintHeroSigil(ctx, p.x, p.y, r, spin, hero.charge, pulse);
     paintHeroAura(ctx, p.x, p.y, r, hero.charge, pulse);
     this.drawHeroAim(hero, p, frame);
-    this.sprites.draw(ctx, key, extent, paint, p.x, p.y, heading);
 
-    // Nova charge as a golden arc around the hero; it closes when the nova is ready.
+    // The body bobs on the spot and kicks back along its facing for a beat after each shot.
+    const bob = still ? 0 : Math.sin(frame.now / 380) * size * 0.025;
+    const recoil = frame.effects.heroRecoil(frame.now);
+    const kick = r * 0.22 * recoil;
+    const x = p.x - Math.cos(heading) * kick;
+    const y = p.y + bob - Math.sin(heading) * kick;
+    const orbit = still ? 0 : (frame.now / (hero.charge >= 1 ? 900 : 2400)) * TAU;
+    paintHeroOrbit(ctx, x, y, r, orbit, hero.charge, "back");
+    this.sprites.draw(ctx, key, extent, paint, x, y, heading);
+
+    const hurt = frame.effects.heroHurt(frame.now);
+    if (hurt > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      circle(ctx, x, y, r * 1.7);
+      ctx.fillStyle = radial(ctx, x, y, r * 1.7, [
+        [0, withAlpha(HURT_COLOR, 0.5 * hurt)],
+        [1, withAlpha(HURT_COLOR, 0)],
+      ]);
+      ctx.fill();
+      ctx.globalAlpha = hurt * 0.5;
+      this.sprites.draw(ctx, key, extent, paint, x, y, heading);
+      ctx.restore();
+    }
+
+    if (recoil > 0) {
+      // A flash at the spear's crystal tip: the tip sits ahead and to the right of the body.
+      const ahead = r * 2.1;
+      const aside = r * 0.68;
+      const tx = x + Math.cos(heading) * ahead - Math.sin(heading) * aside;
+      const ty = y + Math.sin(heading) * ahead + Math.cos(heading) * aside;
+      const reach = r * (0.5 + 0.7 * recoil);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      circle(ctx, tx, ty, reach);
+      ctx.fillStyle = radial(ctx, tx, ty, reach, [
+        [0, withAlpha("#ffffff", 0.9 * recoil)],
+        [0.4, withAlpha(HERO_COLOR, 0.6 * recoil)],
+        [1, withAlpha(HERO_COLOR, 0)],
+      ]);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    paintHeroOrbit(ctx, x, y, r, orbit, hero.charge, "front");
+
+    // Nova charge as a golden arc around the hero; it closes and blazes when the nova is ready.
     if (hero.charge > 0) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r * 1.45, -Math.PI / 2, -Math.PI / 2 + TAU * hero.charge);
-      ctx.strokeStyle = withAlpha(HERO_GOLD, hero.charge >= 1 ? 0.6 + 0.4 * pulse : 0.7);
-      ctx.lineWidth = Math.max(1.5, size * 0.05);
+      const ready = hero.charge >= 1;
       ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.5, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, hero.charge));
+      ctx.strokeStyle = withAlpha(HERO_GOLD, ready ? 0.25 + 0.25 * pulse : 0.2);
+      ctx.lineWidth = Math.max(4, size * 0.14);
       ctx.stroke();
+      ctx.strokeStyle = withAlpha(HERO_GOLD, ready ? 0.7 + 0.3 * pulse : 0.85);
+      ctx.lineWidth = Math.max(1.5, size * 0.05);
+      ctx.stroke();
+      if (ready) {
+        // Four sparks ride the ring so a charged nova is unmistakable.
+        ctx.fillStyle = "#ffffff";
+        for (let i = 0; i < 4; i++) {
+          const a = spin * 1.5 + (i / 4) * TAU;
+          circle(ctx, p.x + Math.cos(a) * r * 1.5, p.y + Math.sin(a) * r * 1.5, r * 0.12);
+          ctx.fill();
+        }
+      }
     }
 
     if (hero.hp < hero.def.hp) {
       const width = Math.max(size * 0.8, r * 2.4);
       const height = Math.max(3, size * 0.08);
-      const x = p.x - width / 2;
-      const y = p.y - r * 1.7 - height * 2;
+      const bx = p.x - width / 2;
+      const by = p.y - r * 1.9 - height * 2;
       const share = Math.max(0, hero.hp / hero.def.hp);
       ctx.fillStyle = PALETTE.hpBack;
-      ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+      ctx.fillRect(bx - 1, by - 1, width + 2, height + 2);
       ctx.fillStyle = share > 0.35 ? HERO_COLOR : PALETTE.hpLow;
-      ctx.fillRect(x, y, width * share, height);
+      ctx.fillRect(bx, by, width * share, height);
     }
   }
 
-  /** A faint line to the enemy the hero is shooting at, so the auto-aim reads as intent. */
+  /** A faint line to the enemy the hero is shooting at, ending in a turning reticle. */
   private drawHeroAim(
     hero: Readonly<HeroState>,
     p: { x: number; y: number },
@@ -793,6 +875,7 @@ export class CanvasRenderer {
       lerp(target.prevY, target.y, frame.alpha),
     );
     const { ctx } = this;
+    const size = this.layout.cellSize;
     ctx.save();
     ctx.strokeStyle = withAlpha(HERO_COLOR, 0.22);
     ctx.lineWidth = 1.5;
@@ -801,6 +884,30 @@ export class CanvasRenderer {
     ctx.moveTo(p.x, p.y);
     ctx.lineTo(q.x, q.y);
     ctx.stroke();
+    ctx.setLineDash([]);
+    const reach = target.def.radius * size * 1.35 + size * 0.08;
+    const turn = frame.reducedMotion ? 0 : frame.now / 700;
+    ctx.strokeStyle = withAlpha(HERO_COLOR, 0.7);
+    ctx.lineWidth = Math.max(1.5, size * 0.04);
+    ctx.lineCap = "round";
+    for (let i = 0; i < 4; i++) {
+      const a = turn + (i / 4) * TAU;
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, reach, a, a + Math.PI / 5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /** A wash of light over the board the instant a nova goes off. */
+  private drawNovaFlash(frame: RenderFrame, board: ScreenRect): void {
+    const amount = frame.effects.novaFlash(frame.now);
+    if (amount <= 0) return;
+    const { ctx } = this;
+    ctx.save();
+    ctx.fillStyle = withAlpha("#ccfbf1", 0.3 * amount);
+    ctx.fillRect(board.x, board.y, board.width, board.height);
+    paintEdgeGlow(ctx, board, HERO_GOLD, 0.4 * amount, this.layout.cellSize * 1.2);
     ctx.restore();
   }
 

@@ -9,12 +9,17 @@ import {
   BOSS_ARRIVAL_MS,
   BUILD_MS,
   buildPop,
+  DASH_TRAIL_MS,
   DEATH_MS,
   Effects,
+  HERO_HURT_MS,
+  HERO_RECOIL_MS,
+  NOVA_FLASH_MS,
   SHAKE_MS,
   UPGRADE_FLASH_MS,
 } from "../src/render/effects";
-import { makeEnemy, TEST_ENEMY, TEST_TOWER } from "./support/fixtures";
+import { createHero } from "../src/core/hero";
+import { makeEnemy, TEST_ENEMY, TEST_HERO, TEST_TOWER } from "./support/fixtures";
 
 const METEOR: PowerDef = {
   id: "meteor",
@@ -153,12 +158,58 @@ describe("Effects juice", () => {
 
   it("clears everything", () => {
     const { bus, effects } = setup();
+    const hero = createHero(TEST_HERO, { x: 1, y: 1 });
     bus.emit("towerPlaced", { tower: tower(2) });
     bus.emit("enemyKilled", { enemy: makeEnemy(), bounty: 1 });
     bus.emit("enemyLeaked", { enemy: makeEnemy(), livesLost: 1 });
+    bus.emit("heroFired", { hero, target: makeEnemy() });
+    bus.emit("heroNova", { hero, radius: 2, targets: 0 });
+    bus.emit("heroDashed", { hero, dx: 1, dy: 0 });
     effects.clear();
     expect(effects.buildProgress(2, 1000)).toBe(1);
     expect(effects.dying(1000)).toHaveLength(0);
     expect(effects.shake(1000)).toEqual({ x: 0, y: 0 });
+    expect(effects.heroRecoil(1000)).toBe(0);
+    expect(effects.novaFlash(1000)).toBe(0);
+    expect(effects.dashTrails(1000)).toHaveLength(0);
+  });
+
+  it("kicks the spear back on a shot, flashes the board for a nova and trails a dash", () => {
+    const { bus, effects, at } = setup();
+    const hero = createHero(TEST_HERO, { x: 2, y: 3 });
+    expect(effects.heroRecoil(1000)).toBe(0);
+    bus.emit("heroFired", { hero, target: makeEnemy() });
+    expect(effects.heroRecoil(1000)).toBe(1);
+    expect(effects.heroRecoil(1000 + HERO_RECOIL_MS / 2)).toBeCloseTo(0.5);
+    expect(effects.heroRecoil(1000 + HERO_RECOIL_MS)).toBe(0);
+    expect(effects.heroRecoil(900)).toBe(0);
+
+    at(2000);
+    bus.emit("heroNova", { hero, radius: 2, targets: 3 });
+    expect(effects.novaFlash(2000)).toBe(1);
+    expect(effects.novaFlash(2000 + NOVA_FLASH_MS / 2)).toBeGreaterThan(0);
+    expect(effects.novaFlash(2000 + NOVA_FLASH_MS)).toBe(0);
+    expect(peakShake(effects, 2000, 2400)).toBeGreaterThan(0);
+
+    at(3000);
+    bus.emit("heroHurt", { hero, damage: 1 });
+    expect(effects.heroHurt(3000)).toBe(1);
+    expect(effects.heroHurt(3000 + HERO_HURT_MS)).toBe(0);
+
+    at(4000);
+    bus.emit("heroDashed", { hero, dx: 0, dy: -1 });
+    const [trail] = effects.dashTrails(4000 + DASH_TRAIL_MS / 2);
+    expect(trail).toMatchObject({ x: 2, y: 3, dx: 0, dy: -1 });
+    expect(trail?.t).toBeCloseTo(0.5);
+    expect(effects.dashTrails(4000 + DASH_TRAIL_MS)).toHaveLength(0);
+  });
+
+  it("keeps the hero still under reduced motion", () => {
+    const { bus, effects } = setup(true);
+    const hero = createHero(TEST_HERO, { x: 2, y: 3 });
+    bus.emit("heroFired", { hero, target: makeEnemy() });
+    bus.emit("heroDashed", { hero, dx: 1, dy: 0 });
+    expect(effects.heroRecoil(1000)).toBe(0);
+    expect(effects.dashTrails(1000)).toHaveLength(0);
   });
 });

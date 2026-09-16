@@ -32,7 +32,7 @@ Nova when charged. Works with mouse, keyboard and touch (a virtual stick on phon
 |                      |                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | Runtime dependencies | **0**. TypeScript, Canvas 2D and the DOM only                                      |
-| Unit tests           | **275**, with **99% statement / 96% branch** coverage of all game logic            |
+| Unit tests           | **277**, with **99% statement / 96% branch** coverage of all game logic            |
 | End-to-end tests     | **26**. Playwright on desktop and mobile Chromium, under the production CSP        |
 | Art assets           | **0 files**. Every tower, enemy and effect is drawn in code and cached as a sprite |
 | Balance guardrails   | Headless bots play the full campaign on 8 seeds in CI                              |

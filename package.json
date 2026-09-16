@@ -27,9 +27,12 @@
     "assets:store": "node scripts/store-screenshots.mjs",
     "assets:readme": "node scripts/readme-screenshots.mjs"
   },
+  "overrides": {
+    "tar": "^7.5.22",
+    "uuid": "^11.1.1"
+  },
   "devDependencies": {
     "@capacitor/android": "^8.5.2",
-    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/ios": "^8.5.2",
     "@eslint/js": "^10.0.1",

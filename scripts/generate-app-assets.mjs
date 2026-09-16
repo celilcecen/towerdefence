@@ -3,8 +3,8 @@
 //   node scripts/generate-app-assets.mjs
 //
 // Renders scripts/brand-sheet.html in headless Chromium through a temporary Vite dev
-// server, writes the source PNGs to assets/, then lets @capacitor/assets produce every
-// Android and iOS size. Run it again whenever src/render/art/brand.ts changes.
+// server, writes the source PNGs to assets/, then lets @capacitor/assets (run through npx)
+// produce every Android and iOS size. Run it again whenever src/render/art/brand.ts changes.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -47,10 +47,13 @@ try {
   await server.close();
 }
 
+// @capacitor/assets is fetched on demand rather than installed: its image stack (sharp,
+// libvips) carries advisories that would fail the audit in CI, and it only runs here.
 execFileSync(
   "npx",
   [
-    "capacitor-assets",
+    "--yes",
+    "@capacitor/assets@3",
     "generate",
     "--iconBackgroundColor",
     BACKGROUND,

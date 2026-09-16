@@ -1,5 +1,5 @@
 import type { PowerDef } from "./content-types";
-import type { EnemyState, ProjectileState, TowerState } from "./state";
+import type { EnemyState, HeroState, ProjectileState, TowerState } from "./state";
 
 /** Everything observable that happens inside the simulation. */
 export interface GameEvents {
@@ -28,6 +28,17 @@ export interface GameEvents {
     readonly power: PowerDef;
     readonly x: number;
     readonly y: number;
+    readonly targets: number;
+  };
+  heroFired: { readonly hero: Readonly<HeroState>; readonly target: Readonly<EnemyState> };
+  /** Damage taken this tick from touching enemies. */
+  heroHurt: { readonly hero: Readonly<HeroState>; readonly damage: number };
+  heroDowned: { readonly hero: Readonly<HeroState> };
+  heroRespawned: { readonly hero: Readonly<HeroState> };
+  heroDashed: { readonly hero: Readonly<HeroState>; readonly dx: number; readonly dy: number };
+  heroNova: {
+    readonly hero: Readonly<HeroState>;
+    readonly radius: number;
     readonly targets: number;
   };
   waveStarted: { readonly wave: number; readonly early: boolean; readonly bonus: number };

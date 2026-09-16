@@ -8,7 +8,7 @@ import type { Region } from "./clusters";
 import { clusterRegions } from "./clusters";
 import { lighten, withAlpha } from "./color";
 import { enemyHeading } from "./motion";
-import { enemyColor, isBoss, PALETTE, towerColor } from "./palette";
+import { enemyColor, HERO_COLOR, HERO_GOLD, isBoss, PALETTE, towerColor } from "./palette";
 
 interface Timed {
   readonly x: number;
@@ -104,6 +104,20 @@ export const DEATH_MS = 260;
 /** Milliseconds an ordinary screen shake takes to die away. */
 export const SHAKE_MS = 300;
 export const BOSS_ARRIVAL_MS = 900;
+/** Milliseconds the edge flash lasts after the hero was last hurt. */
+export const HERO_HURT_MS = 360;
+/** Milliseconds a dash leaves afterimages behind the hero. */
+export const DASH_TRAIL_MS = 300;
+
+/** A dash in progress or just finished: where it began, which way it went, and how far along. */
+export interface DashTrail {
+  readonly x: number;
+  readonly y: number;
+  readonly dx: number;
+  readonly dy: number;
+  /** 0 at the start of the dash, 1 when the trail has faded. */
+  readonly t: number;
+}
 /** Share of BUILD_MS a new tower spends falling before it lands. */
 const BUILD_FALL = 0.55;
 const MUZZLE_REACH = 0.42;
@@ -143,8 +157,16 @@ export class Effects {
     readonly duration: number;
   }[] = [];
   private hurtAt = Number.NEGATIVE_INFINITY;
+  private heroHurtAt = Number.NEGATIVE_INFINITY;
   private freezeAt = Number.NEGATIVE_INFINITY;
   private bossAt = Number.NEGATIVE_INFINITY;
+  private dashes: {
+    readonly x: number;
+    readonly y: number;
+    readonly dx: number;
+    readonly dy: number;
+    readonly start: number;
+  }[] = [];
   private seeds = 0;
   private gates: { readonly exits: readonly Cell[]; readonly regions: Region[] } | undefined;
 
@@ -393,6 +415,76 @@ export class Effects {
             break;
         }
       }),
+      events.on("heroHurt", () => {
+        this.heroHurtAt = now();
+      }),
+      events.on("heroDashed", ({ hero, dx, dy }) => {
+        if (!this.reducedMotion) this.dashes.push({ x: hero.x, y: hero.y, dx, dy, start: now() });
+        burst(hero.x, hero.y, 0.5, withAlpha(HERO_COLOR, 0.8), 6, 260);
+      }),
+      events.on("heroDowned", ({ hero }) => {
+        this.heroHurtAt = now();
+        this.kick(0.1, 360);
+        burst(hero.x, hero.y, 0.8, "#94a3b8", 12, 520);
+        burst(hero.x, hero.y, 0.6, HERO_COLOR, 8, 420);
+        add({
+          kind: "ring",
+          x: hero.x,
+          y: hero.y,
+          radius: 0.9,
+          color: PALETTE.hpLow,
+          filled: false,
+          start: now(),
+          duration: 520,
+        });
+      }),
+      events.on("heroRespawned", ({ hero }) => {
+        add({
+          kind: "ring",
+          x: hero.x,
+          y: hero.y,
+          radius: 1,
+          color: HERO_COLOR,
+          filled: true,
+          start: now(),
+          duration: 520,
+        });
+        burst(hero.x, hero.y, 0.8, lighten(HERO_COLOR, 0.4), 12, 520);
+      }),
+      events.on("heroNova", ({ hero, radius }) => {
+        this.kick(0.2, 420);
+        add({
+          kind: "ring",
+          x: hero.x,
+          y: hero.y,
+          radius,
+          color: HERO_COLOR,
+          filled: true,
+          start: now(),
+          duration: 520,
+        });
+        add({
+          kind: "ring",
+          x: hero.x,
+          y: hero.y,
+          radius: radius * 1.08,
+          color: HERO_GOLD,
+          filled: false,
+          start: now() + 70,
+          duration: 560,
+        });
+        add({
+          kind: "flash",
+          x: hero.x,
+          y: hero.y,
+          radius: radius * 0.7,
+          color: lighten(HERO_COLOR, 0.5),
+          start: now(),
+          duration: 260,
+        });
+        burst(hero.x, hero.y, radius, lighten(HERO_COLOR, 0.3), 18, 620);
+        burst(hero.x, hero.y, radius * 0.7, HERO_GOLD, 10, 520);
+      }),
       events.on("waveStarted", ({ early, bonus }) => {
         if (!early || bonus <= 0) return;
         add({
@@ -489,8 +581,25 @@ export class Effects {
     this.deaths = [];
     this.shakes = [];
     this.hurtAt = Number.NEGATIVE_INFINITY;
+    this.heroHurtAt = Number.NEGATIVE_INFINITY;
     this.freezeAt = Number.NEGATIVE_INFINITY;
     this.bossAt = Number.NEGATIVE_INFINITY;
+    this.dashes = [];
+  }
+
+  /** 1 the instant the hero is hurt, fading to 0 over HERO_HURT_MS. */
+  heroHurt(now: number): number {
+    const t = (now - this.heroHurtAt) / HERO_HURT_MS;
+    return t < 0 || t >= 1 ? 0 : 1 - t;
+  }
+
+  /** Dashes still leaving afterimages. Empty under reduced motion. */
+  dashTrails(now: number): readonly DashTrail[] {
+    if (this.dashes.length === 0) return [];
+    this.dashes = this.dashes.filter((d) => now - d.start < DASH_TRAIL_MS);
+    return this.dashes
+      .filter((d) => now >= d.start)
+      .map((d) => ({ x: d.x, y: d.y, dx: d.dx, dy: d.dy, t: (now - d.start) / DASH_TRAIL_MS }));
   }
 
   /** 1 the instant an enemy is hit, fading to 0 over HIT_FLASH_MS. */

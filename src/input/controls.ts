@@ -17,6 +17,36 @@ export function bindControls(
   const { session } = app;
   const playing = (): boolean => app.screen.kind === "game" && app.overlay === undefined;
 
+  // Movement keys are held, not tapped: the pressed set becomes one direction vector.
+  const MOVE_KEYS: Readonly<Record<string, readonly [number, number]>> = {
+    w: [0, -1],
+    arrowup: [0, -1],
+    s: [0, 1],
+    arrowdown: [0, 1],
+    a: [-1, 0],
+    arrowleft: [-1, 0],
+    d: [1, 0],
+    arrowright: [1, 0],
+  };
+  const held = new Set<string>();
+  const steer = (): void => {
+    let dx = 0;
+    let dy = 0;
+    for (const key of held) {
+      const [x, y] = MOVE_KEYS[key] ?? [0, 0];
+      dx += x;
+      dy += y;
+    }
+    const length = Math.hypot(dx, dy) || 1;
+    const world = renderer.worldDirection(dx / length, dy / length);
+    if (dx === 0 && dy === 0) session.stopHero();
+    else session.moveHero(world.x, world.y);
+  };
+  const letGo = (): void => {
+    held.clear();
+    session.stopHero();
+  };
+
   canvas.addEventListener(
     "pointermove",
     (event) => {
@@ -72,6 +102,23 @@ export function bindControls(
       }
       if (!playing()) return;
 
+      if (key in MOVE_KEYS) {
+        event.preventDefault();
+        if (!held.has(key)) {
+          held.add(key);
+          steer();
+        }
+        return;
+      }
+      if (key === "shift") {
+        if (!event.repeat) session.dash();
+        return;
+      }
+      if (key === "r") {
+        session.nova();
+        return;
+      }
+
       const tower = session.content.towers.find((t) => t.hotkey === event.key);
       if (tower) {
         session.selectBuild(tower.id);
@@ -90,7 +137,7 @@ export function bindControls(
         case "u":
           session.upgradeSelected();
           break;
-        case "s":
+        case "x":
           session.sellSelected();
           break;
         case "p":
@@ -103,6 +150,16 @@ export function bindControls(
     },
     { signal },
   );
+
+  keyTarget.addEventListener(
+    "keyup",
+    (event) => {
+      const key = event.key.toLowerCase();
+      if (held.delete(key)) steer();
+    },
+    { signal },
+  );
+  keyTarget.addEventListener("blur", letGo, { signal });
 
   return () => {
     controller.abort();

@@ -62,7 +62,8 @@ test("a new player is taught to build a maze by a hands-on tutorial", async ({ p
 
   await page.getByRole("button", { name: /Bolt/ }).click();
   await expect(bubble).toContainText("glowing tile");
-  await clickCell(page, 8, 2);
+  // Far from the glowing tile and from the coach bubble that points at it.
+  await clickCell(page, 12, 7);
   await expect(page.getByRole("status").first()).toHaveText("Build on the glowing tile.");
   await clickCell(page, 3, 5);
   await expect(stat(page, "gold")).toHaveText("180");
@@ -133,6 +134,36 @@ test("classic mode starts with the original rules", async ({ page }) => {
   await expect(stat(page, "lives")).toHaveText("20");
   await expect(page.locator("#wave-preview")).toContainText("8 Grunt");
   await expect(page.locator("#hint")).toContainText("Pick a tower");
+});
+
+test("the Sentinel is steered from the stick or keyboard and its dash recharges", async ({
+  page,
+}) => {
+  await startClassic(page);
+  const stick = page.locator("#stick");
+  const dash = page.locator("#dash");
+  await expect(stick).toBeVisible();
+  await expect(page.locator("#nova")).toBeDisabled();
+  await expect(dash).toBeEnabled();
+
+  await page.keyboard.down("a");
+  await page.waitForTimeout(400);
+  await page.keyboard.up("a");
+  await page.keyboard.press("Shift");
+  await expect(dash).toBeDisabled();
+  await expect(dash).toBeEnabled({ timeout: 5000 });
+
+  const box = await stick.boundingBox();
+  if (!box) throw new Error("stick not laid out");
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx, cy - 40, { steps: 4 });
+  await expect(stick).toHaveAttribute("data-active", "");
+  await page.mouse.up();
+  await expect(stick).not.toHaveAttribute("data-active", "");
+  await expect(page.locator("#hero-status")).toBeHidden();
 });
 
 test("towers, enemies and the board are drawn, not left blank", async ({ page }) => {

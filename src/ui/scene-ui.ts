@@ -3,7 +3,12 @@ import { findLevel } from "../core/campaign";
 import { paintChapterScene, paintEnding, paintTitleBackdrop } from "../render/art/story";
 import { requireElement } from "./dom";
 
-type ScenePainter = (ctx: CanvasRenderingContext2D, width: number, height: number, now: number) => void;
+type ScenePainter = (
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  now: number,
+) => void;
 
 /** Illustrations animate at a gentle rate; they are backdrops, not gameplay. */
 const FRAME_MS = 1000 / 30;
@@ -57,7 +62,8 @@ export class SceneUi {
   }
 
   private target():
-    { readonly canvas: HTMLCanvasElement; readonly paint: ScenePainter; readonly key: string } | undefined {
+    | { readonly canvas: HTMLCanvasElement; readonly paint: ScenePainter; readonly key: string }
+    | undefined {
     const { app } = this;
     const screen = app.screen;
     switch (screen.kind) {

@@ -53,6 +53,10 @@ const ENEMY_COLORS: Readonly<Record<string, string>> = {
 
 const BOSSES: ReadonlySet<string> = new Set(["warden", "tyrant"]);
 
+/** The hero and everything it fires or casts. */
+export const HERO_COLOR = "#5eead4";
+export const HERO_GOLD = "#fde68a";
+
 export const towerColor = (id: string): string => TOWER_COLORS[id] ?? PALETTE.fallback;
 export const isBoss = (id: string): boolean => BOSSES.has(id);
 export const enemyColor = (id: string): string => ENEMY_COLORS[id] ?? PALETTE.fallback;

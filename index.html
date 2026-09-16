@@ -66,6 +66,34 @@
           <span id="wave-preview-list" class="preview-list"></span>
         </div>
         <div id="powers" class="powers" role="toolbar" data-t-aria="hud.powers" hidden></div>
+        <div id="hero-controls" class="hero-controls" hidden>
+          <div
+            id="stick"
+            class="stick"
+            role="application"
+            data-t-aria="hud.stick"
+            aria-label="Move the Sentinel"
+          >
+            <div id="stick-knob" class="stick-knob" aria-hidden="true"></div>
+          </div>
+          <div class="hero-actions">
+            <button id="nova" class="hero-button nova" type="button" aria-keyshortcuts="R" disabled>
+              <span class="hero-glyph nova-glyph" aria-hidden="true"></span>
+              <span class="hero-label" data-t="hud.nova">Nova</span>
+            </button>
+            <button
+              id="dash"
+              class="hero-button dash"
+              type="button"
+              aria-keyshortcuts="Shift"
+              disabled
+            >
+              <span class="hero-glyph dash-glyph" aria-hidden="true"></span>
+              <span class="hero-label" data-t="hud.dash">Dash</span>
+            </button>
+          </div>
+          <p id="hero-status" class="hero-status" role="status" hidden></p>
+        </div>
         <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
       </main>
 
@@ -91,7 +119,7 @@
           <div id="targeting" class="segments" role="group" data-t-aria="panel.targeting"></div>
           <div class="panel-actions">
             <button id="upgrade" class="primary" type="button" aria-keyshortcuts="U"></button>
-            <button id="sell" class="ghost" type="button" aria-keyshortcuts="S"></button>
+            <button id="sell" class="ghost" type="button" aria-keyshortcuts="X"></button>
           </div>
         </section>
       </footer>
@@ -202,7 +230,6 @@
           </div>
         </div>
       </section>
-
 
       <div id="coach" class="coach-layer" hidden>
         <div id="coach-rings" class="coach-rings" aria-hidden="true"></div>

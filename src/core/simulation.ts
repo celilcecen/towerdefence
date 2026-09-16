@@ -5,6 +5,7 @@ import { EventBus } from "./events";
 import { FlowField } from "./flow-field";
 import type { GameEvents } from "./game-events";
 import { Grid } from "./grid";
+import { createHero, heroHome } from "./hero";
 import type { SimulationInternals } from "./internals";
 import type { PlacementCheck } from "./placement";
 import { checkPlacement } from "./placement";
@@ -12,6 +13,7 @@ import { Rng } from "./rng";
 import { hashWorld } from "./state-hash";
 import type { WorldState, WorldView } from "./state";
 import { EnemyAbilitySystem, PowerCooldownSystem } from "./systems/abilities";
+import { HeroSystem } from "./systems/hero";
 import { EnemyMovementSystem } from "./systems/movement";
 import { ProjectileSystem } from "./systems/projectiles";
 import { ResolutionSystem } from "./systems/resolution";
@@ -26,12 +28,13 @@ export interface SimulationOptions {
   readonly systems?: readonly System[];
 }
 
-/** Order matters: spawn, move, use abilities, shoot, fly, recharge, then settle the outcome. */
+/** Order matters: spawn, move, use abilities, hero, shoot, fly, recharge, then settle the outcome. */
 export function createDefaultSystems(): System[] {
   return [
     new WaveSpawnSystem(),
     new EnemyMovementSystem(),
     new EnemyAbilitySystem(),
+    new HeroSystem(),
     new TowerSystem(),
     new ProjectileSystem(),
     new PowerCooldownSystem(),
@@ -72,6 +75,7 @@ export class Simulation {
       projectiles: [],
       spawnQueue: [],
       powers: content.powers.map((power) => ({ id: power.id, cooldown: 0 })),
+      hero: content.hero ? createHero(content.hero, heroHome(this.grid)) : undefined,
       nextId: 1,
     };
 

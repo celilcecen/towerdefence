@@ -7,6 +7,7 @@ Every claim describes what is in the build; no ratings, download counts or revie
 
 **App name (30 max):** Gridlock: Maze Defense
 **Subtitle / short description (App Store 30 / Play 80):**
+
 - App Store subtitle: Build the maze. Hold the line.
 - Play short description: Your towers are the walls. Wall the monsters into the longest road.
 
@@ -33,6 +34,7 @@ So don't leave them a short road.
 
 **Uygulama adı:** Gridlock: Labirent Savunması
 **Alt başlık / kısa açıklama:**
+
 - App Store alt başlık: Labirenti kur. Hattı tut.
 - Play kısa açıklama: Kulelerin aynı zamanda duvar. Canavarları en uzun yola hapset.
 

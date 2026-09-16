@@ -28,10 +28,12 @@ export function findLevel(campaign: CampaignDef, id: string): LevelRef | undefin
 export function levelContent(campaign: CampaignDef, level: LevelDef): GameContent {
   const pick = <T extends { readonly id: string }>(all: readonly T[], ids: readonly string[]) =>
     ids.flatMap((id) => all.filter((item) => item.id === id));
+  const hero = campaign.heroes.find((h) => h.id === level.hero);
   return {
     towers: pick(campaign.towers, level.towers),
     enemies: campaign.enemies,
     powers: pick(campaign.powers, level.powers),
+    ...(hero ? { hero } : {}),
     waves: level.waves,
     map: level.map,
     rules: {
@@ -41,6 +43,10 @@ export function levelContent(campaign: CampaignDef, level: LevelDef): GameConten
     },
   };
 }
+
+const duplicateIds = (ids: readonly string[]): string[] => [
+  ...new Set(ids.filter((id, i) => ids.indexOf(id) !== i)),
+];
 
 /** Structural checks across levels, plus full content validation of each one. */
 export function validateCampaign(campaign: CampaignDef): string[] {
@@ -56,8 +62,15 @@ export function validateCampaign(campaign: CampaignDef): string[] {
 
   const towerIds = new Set(campaign.towers.map((t) => t.id));
   const powerIds = new Set(campaign.powers.map((p) => p.id));
+  const heroIds = new Set(campaign.heroes.map((h) => h.id));
+  for (const id of duplicateIds(campaign.heroes.map((h) => h.id))) {
+    errors.push(`Duplicate hero id "${id}".`);
+  }
   for (const { level } of levels) {
     const where = `Level "${level.id}"`;
+    if (level.hero !== undefined && !heroIds.has(level.hero)) {
+      errors.push(`${where}: unknown hero "${level.hero}".`);
+    }
     for (const id of level.towers) {
       if (!towerIds.has(id)) errors.push(`${where}: unknown tower "${id}".`);
     }

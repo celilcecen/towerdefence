@@ -1,5 +1,6 @@
 import type { GameContent, RulesDef } from "../core/content-types";
 import { ENEMIES } from "./enemies";
+import { SENTINEL } from "./heroes";
 import { CROSSING } from "./maps";
 import { TOWERS } from "./towers";
 import { WAVES } from "./waves";
@@ -18,12 +19,13 @@ export const RULES: RulesDef = {
   earlyCallRatio: 0.5,
 };
 
-/** Classic mode: the original 15-wave game on The Crossing, unchanged since launch. */
+/** Classic mode: the original 15-wave game on The Crossing, now with the Sentinel on the field. */
 export const GAME_CONTENT: GameContent = {
   towers: TOWERS.filter((t) => CLASSIC_TOWERS.includes(t.id)),
   enemies: ENEMIES.filter((e) => CLASSIC_ENEMIES.includes(e.id)),
   waves: WAVES,
   powers: [],
+  hero: SENTINEL,
   map: CROSSING,
   rules: RULES,
 };

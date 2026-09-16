@@ -3,10 +3,11 @@ import type { Cell } from "../core/geometry";
 import { cellCenter } from "../core/geometry";
 import type { Grid } from "../core/grid";
 import type { Simulation } from "../core/simulation";
-import type { EnemyState, TowerState } from "../core/state";
-import { currentLevel, towerCenter } from "../core/state";
+import type { EnemyState, HeroState, TowerState } from "../core/state";
+import { currentLevel, HERO_ID, towerCenter } from "../core/state";
 import { circle, radial, TAU } from "./art/common";
 import { enemyArt, FLAP_FRAMES, paintFeet } from "./art/enemies";
+import { HERO_EXTENT, paintHero, paintHeroAura, paintHeroBolt, paintHeroShadow } from "./art/hero";
 import { paintDart, paintMortarShell, paintShell } from "./art/projectiles";
 import type { TerrainTheme } from "./art/terrain";
 import {
@@ -27,10 +28,10 @@ import { withAlpha } from "./color";
 import type { Effects } from "./effects";
 import { buildPop, DEATH_MS } from "./effects";
 import type { BoardLayout } from "./layout";
-import { computeLayout, pointToCell, screenAngle, toScreen } from "./layout";
+import { computeLayout, pointToCell, screenAngle, toScreen, worldDirection } from "./layout";
 import type { TurretAim } from "./motion";
 import { enemyHeading } from "./motion";
-import { enemyColor, isBoss, PALETTE, towerColor } from "./palette";
+import { enemyColor, HERO_COLOR, HERO_GOLD, isBoss, PALETTE, towerColor } from "./palette";
 import type { SurfaceFactory } from "./sprite-cache";
 import { SpriteCache } from "./sprite-cache";
 
@@ -69,6 +70,9 @@ const FLAP_MS = 560;
 const BOB_MS = 1500;
 const GUIDE_COLOR = "#fde047";
 const DANGER_COLOR = "#ef4444";
+const HURT_COLOR = "#f43f5e";
+/** Afterimages drawn behind a dashing hero. */
+const DASH_GHOSTS = 3;
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
@@ -119,6 +123,11 @@ export class CanvasRenderer {
     this.layout = computeLayout(cssWidth, cssHeight, columns, rows);
     this.sprites.configure(this.layout.cellSize, pixelRatio);
     this.terrain = undefined;
+  }
+
+  /** A direction on screen as a direction on the board; the stick and arrow keys use it. */
+  worldDirection(dx: number, dy: number): { readonly x: number; readonly y: number } {
+    return worldDirection(this.layout, dx, dy);
   }
 
   cellAt(clientX: number, clientY: number): Cell | undefined {
@@ -179,6 +188,7 @@ export class CanvasRenderer {
     for (const tower of frame.simulation.world.towers) this.drawTower(tower, frame);
     this.drawDying(frame);
     for (const enemy of frame.simulation.world.enemies) this.drawEnemy(enemy, frame);
+    this.drawHero(frame);
     this.drawProjectiles(frame);
     if (!frame.reducedMotion) {
       paintAtmosphere(ctx, theme.id, board, size, frame.now, marks.rocks, (x, y) =>
@@ -188,6 +198,7 @@ export class CanvasRenderer {
     this.drawFreeze(frame, board);
     this.drawBossShadow(frame, board);
     this.drawDanger(frame, board);
+    this.drawHeroHurt(frame, board);
     frame.effects.draw(ctx, (x, y) => this.point(x, y), size, frame.now, grid);
     this.drawSelection(frame);
     this.drawGuide(frame);
@@ -675,6 +686,11 @@ export class CanvasRenderer {
         lerp(shot.prevX, shot.x, frame.alpha),
         lerp(shot.prevY, shot.y, frame.alpha),
       );
+      if (shot.towerId === HERO_ID) {
+        const aim = this.point(shot.aimX, shot.aimY);
+        paintHeroBolt(this.ctx, p.x, p.y, Math.atan2(aim.y - p.y, aim.x - p.x), size);
+        continue;
+      }
       const kind = kinds.get(shot.towerId);
       if (shot.splashRadius > 0) {
         if (kind === "mortar") paintMortarShell(this.ctx, p.x, p.y, size, towerColor(kind));
@@ -685,6 +701,116 @@ export class CanvasRenderer {
       const angle = Math.atan2(aim.y - p.y, aim.x - p.x);
       paintDart(this.ctx, p.x, p.y, angle, size, towerColor(kind ?? "bolt"));
     }
+  }
+
+  private drawHero(frame: RenderFrame): void {
+    const hero = frame.simulation.world.hero;
+    if (!hero) return;
+    const { ctx } = this;
+    const size = this.layout.cellSize;
+    const r = hero.def.radius * size;
+    const p = this.point(
+      lerp(hero.prevX, hero.x, frame.alpha),
+      lerp(hero.prevY, hero.y, frame.alpha),
+    );
+    const heading = screenAngle(this.layout, hero.facing);
+    const key = `hero:${hero.def.id}`;
+    const extent = hero.def.radius * HERO_EXTENT;
+    const paint = (g: CanvasRenderingContext2D, cell: number): void => {
+      paintHero(g, hero.def.radius * cell);
+    };
+
+    if (hero.status === "down") {
+      paintHeroShadow(ctx, p.x, p.y, r * 0.8);
+      ctx.save();
+      ctx.globalAlpha = 0.4;
+      this.sprites.draw(ctx, key, extent, paint, p.x, p.y, heading + Math.PI / 2);
+      ctx.restore();
+      const share = 1 - hero.respawnTimer / hero.def.respawn;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.5, -Math.PI / 2, -Math.PI / 2 + TAU * share);
+      ctx.strokeStyle = withAlpha(HERO_COLOR, 0.9);
+      ctx.lineWidth = Math.max(2, size * 0.07);
+      ctx.lineCap = "round";
+      ctx.stroke();
+      return;
+    }
+
+    if (!frame.reducedMotion) {
+      for (const trail of frame.effects.dashTrails(frame.now)) {
+        for (let i = 1; i <= DASH_GHOSTS; i++) {
+          const f = Math.max(0, trail.t - i * 0.14);
+          const reach = hero.def.dash.distance * f;
+          const g = this.point(trail.x + trail.dx * reach, trail.y + trail.dy * reach);
+          ctx.save();
+          ctx.globalAlpha = (1 - trail.t) * 0.3 * (1 - (i - 1) / DASH_GHOSTS);
+          this.sprites.draw(ctx, key, extent, paint, g.x, g.y, heading);
+          ctx.restore();
+        }
+      }
+    }
+
+    paintHeroShadow(ctx, p.x, p.y, r);
+    const pulse = frame.reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(frame.now / 240);
+    paintHeroAura(ctx, p.x, p.y, r, hero.charge, pulse);
+    this.drawHeroAim(hero, p, frame);
+    this.sprites.draw(ctx, key, extent, paint, p.x, p.y, heading);
+
+    // Nova charge as a golden arc around the hero; it closes when the nova is ready.
+    if (hero.charge > 0) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 1.45, -Math.PI / 2, -Math.PI / 2 + TAU * hero.charge);
+      ctx.strokeStyle = withAlpha(HERO_GOLD, hero.charge >= 1 ? 0.6 + 0.4 * pulse : 0.7);
+      ctx.lineWidth = Math.max(1.5, size * 0.05);
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+
+    if (hero.hp < hero.def.hp) {
+      const width = Math.max(size * 0.8, r * 2.4);
+      const height = Math.max(3, size * 0.08);
+      const x = p.x - width / 2;
+      const y = p.y - r * 1.7 - height * 2;
+      const share = Math.max(0, hero.hp / hero.def.hp);
+      ctx.fillStyle = PALETTE.hpBack;
+      ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+      ctx.fillStyle = share > 0.35 ? HERO_COLOR : PALETTE.hpLow;
+      ctx.fillRect(x, y, width * share, height);
+    }
+  }
+
+  /** A faint line to the enemy the hero is shooting at, so the auto-aim reads as intent. */
+  private drawHeroAim(
+    hero: Readonly<HeroState>,
+    p: { x: number; y: number },
+    frame: RenderFrame,
+  ): void {
+    if (hero.targetId === undefined) return;
+    const target = frame.simulation.world.enemies.find((e) => e.id === hero.targetId);
+    if (!target) return;
+    const q = this.point(
+      lerp(target.prevX, target.x, frame.alpha),
+      lerp(target.prevY, target.y, frame.alpha),
+    );
+    const { ctx } = this;
+    ctx.save();
+    ctx.strokeStyle = withAlpha(HERO_COLOR, 0.22);
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(q.x, q.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /** A red pulse at the board's edges while the hero is being hurt. */
+  private drawHeroHurt(frame: RenderFrame, board: ScreenRect): void {
+    const hurt = frame.effects.heroHurt(frame.now);
+    if (hurt <= 0) return;
+    this.ctx.save();
+    paintEdgeGlow(this.ctx, board, HURT_COLOR, 0.28 * hurt, this.layout.cellSize * 1.1);
+    this.ctx.restore();
   }
 
   /** An icy wash over the whole board just after Frostbind is cast. */

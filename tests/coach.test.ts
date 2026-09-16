@@ -76,8 +76,13 @@ describe("tutorial", () => {
     session.setGuide(coach.guide);
     session.activateCell({ x: 3, y: 4 });
     session.activateCell({ x: 3, y: 6 });
-    expect(step()).toBe("start");
+    expect(step()).toBe("hero");
     expect(coach.guide).toBeUndefined();
+    expect(coach.view?.anchor).toEqual({ kind: "element", selector: "#stick" });
+    session.moveHero(-1, 0);
+    for (let i = 0; i < 15; i++) session.step();
+    session.stopHero();
+    expect(step()).toBe("start");
 
     session.startWave();
     expect(step()).toBe("watch");
@@ -199,7 +204,10 @@ describe("onboarding data", () => {
       for (const tip of TIPS) expect(tips[tip.id], `${t.locale} ${tip.id}`).toBeTruthy();
       for (const [levelId, beats] of Object.entries(STORY_BEATS)) {
         for (const beat of beats) {
-          expect(t.dialogue[levelId]?.[beat.line], `${t.locale} ${levelId} ${beat.line}`).toBeTruthy();
+          expect(
+            t.dialogue[levelId]?.[beat.line],
+            `${t.locale} ${levelId} ${beat.line}`,
+          ).toBeTruthy();
         }
       }
       expect(t.ending.text.length).toBeGreaterThan(40);

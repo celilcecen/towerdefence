@@ -1,7 +1,8 @@
 import { TARGETING_MODES } from "./content-types";
-import type { Phase, WorldView } from "./state";
+import type { HeroStatus, Phase, WorldView } from "./state";
 
 const PHASES: readonly Phase[] = ["building", "wave", "won", "lost"];
+const HERO_STATUSES: readonly HeroStatus[] = ["alive", "down"];
 const FNV_OFFSET = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
 
@@ -67,6 +68,22 @@ export function hashWorld(world: WorldView): number {
   }
   for (const cursor of world.spawnQueue) {
     h.add(cursor.spawned, cursor.timer);
+  }
+  const { hero } = world;
+  if (hero) {
+    h.add(
+      hero.x,
+      hero.y,
+      hero.hp,
+      hero.moveX,
+      hero.moveY,
+      hero.attackCooldown,
+      hero.dashCooldown,
+      hero.dashTimer,
+      hero.charge,
+      HERO_STATUSES.indexOf(hero.status),
+      hero.respawnTimer,
+    );
   }
   return h.value;
 }

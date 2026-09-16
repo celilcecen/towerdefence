@@ -1352,3 +1352,240 @@ input[type="range"] {
     border-radius: 18px 18px 0 0;
   }
 }
+
+/* ---------- Hero controls ---------- */
+
+.hero-controls {
+  --hero: #5eead4;
+  --hero-gold: #fde68a;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.stick {
+  position: absolute;
+  left: max(12px, var(--safe-left));
+  bottom: 12px;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--hero) 40%, transparent);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--hero) 14%, transparent),
+    color-mix(in srgb, var(--hero) 4%, transparent) 62%,
+    transparent 72%
+  );
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.stick::before {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--hero) 30%, transparent);
+}
+
+.stick[data-active] {
+  border-color: color-mix(in srgb, var(--hero) 80%, transparent);
+  cursor: grabbing;
+}
+
+.stick[data-down] {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #c7fff4, #2dd4bf 52%, #0f766e);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.55),
+    0 0 20px color-mix(in srgb, var(--hero) 40%, transparent);
+  transition: transform 70ms linear;
+}
+
+.stick[data-active] .stick-knob {
+  transition: none;
+}
+
+.hero-actions {
+  position: absolute;
+  right: max(12px, var(--safe-right));
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+.hero-button {
+  --cool: 0;
+  --charge: 0;
+  position: relative;
+  width: 66px;
+  height: 66px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  background: radial-gradient(circle at 50% 35%, var(--panel-3), var(--panel));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  touch-action: manipulation;
+}
+
+.hero-button:disabled {
+  opacity: 1;
+}
+
+.hero-button.dash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(5, 8, 11, 0.72) calc(var(--cool) * 1turn), transparent 0);
+  pointer-events: none;
+}
+
+.hero-button.nova::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--hero-gold) calc(var(--charge) * 1turn),
+    rgba(255, 255, 255, 0.08) 0
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  pointer-events: none;
+}
+
+.hero-button.nova:disabled .nova-glyph {
+  opacity: 0.55;
+}
+
+.hero-button[data-ready] {
+  border-color: var(--hero);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--hero) 25%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.hero-button.nova[data-ready] {
+  border-color: var(--hero-gold);
+  animation: nova-ready 1.1s ease-in-out infinite;
+}
+
+@keyframes nova-ready {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--hero-gold) 30%, transparent),
+      0 6px 18px rgba(0, 0, 0, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--hero-gold) 12%, transparent),
+      0 0 26px color-mix(in srgb, var(--hero-gold) 45%, transparent);
+  }
+}
+
+.hero-glyph {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.dash-glyph {
+  background:
+    linear-gradient(
+        90deg,
+        transparent 0 30%,
+        var(--hero) 30% 44%,
+        transparent 44% 56%,
+        var(--hero) 56% 70%,
+        transparent 70%
+      )
+      center / 100% 6px no-repeat,
+    radial-gradient(circle at 72% 50%, var(--hero) 0 34%, transparent 36%);
+  border-radius: 0;
+}
+
+.nova-glyph {
+  background:
+    radial-gradient(circle, #fff7d6 0 18%, var(--hero-gold) 20% 34%, transparent 36%),
+    conic-gradient(
+      from 0deg,
+      var(--hero-gold) 0 8%,
+      transparent 8% 25%,
+      var(--hero-gold) 25% 33%,
+      transparent 33% 50%,
+      var(--hero-gold) 50% 58%,
+      transparent 58% 75%,
+      var(--hero-gold) 75% 83%,
+      transparent 83%
+    );
+  -webkit-mask: radial-gradient(circle, #000 0 60%, transparent 62%);
+  mask: radial-gradient(circle, #000 0 60%, transparent 62%);
+}
+
+.hero-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  z-index: 1;
+}
+
+.hero-status {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(5, 8, 11, 0.8);
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border));
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* The hero buttons take the bottom-right corner; powers stack above them. */
+.stage[data-hero="true"] .powers {
+  bottom: 176px;
+}
+
+@media (max-width: 560px) {
+  .stick {
+    width: 112px;
+    height: 112px;
+  }
+
+  .hero-button {
+    width: 60px;
+    height: 60px;
+  }
+
+  .stage[data-hero="true"] .powers {
+    bottom: 164px;
+  }
+}

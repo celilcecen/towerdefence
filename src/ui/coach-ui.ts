@@ -113,10 +113,7 @@ export class CoachUi {
     setFlag(this.skip, "hidden", view.kind !== "tutorial" || view.step === view.steps);
     setFlag(this.next, "hidden", !view.tap);
     const last = view.kind === "tutorial" && view.step === view.steps;
-    setText(
-      this.next,
-      view.kind === "tip" ? t.coach.gotIt : last ? t.coach.letsGo : t.coach.next,
-    );
+    setText(this.next, view.kind === "tip" ? t.coach.gotIt : last ? t.coach.letsGo : t.coach.next);
     setFlag(this.layer, "data-dim", view.tap);
     if (view.tap && moved) this.next.focus({ preventScroll: true });
     // Restart the entrance animation for each new message.
@@ -180,7 +177,9 @@ export class CoachUi {
     }
     left = Math.min(Math.max(MARGIN, left), viewWidth - width - MARGIN);
     top = Math.min(Math.max(MARGIN, top), viewHeight - height - MARGIN);
-    setAttr(this.bubble, "style", `left:${Math.round(left)}px;top:${Math.round(top)}px`);
+    // Through the CSSOM, not the style attribute: the CSP forbids inline style text.
+    this.bubble.style.left = `${Math.round(left)}px`;
+    this.bubble.style.top = `${Math.round(top)}px`;
   }
 }
 

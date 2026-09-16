@@ -1,6 +1,7 @@
 import type {
   EnemyDef,
   GameContent,
+  HeroDef,
   MapDef,
   PowerDef,
   RulesDef,
@@ -45,6 +46,10 @@ export class ContentRegistry {
 
   get powers(): readonly PowerDef[] {
     return this.content.powers;
+  }
+
+  get hero(): HeroDef | undefined {
+    return this.content.hero;
   }
 
   get waves(): readonly WaveDef[] {

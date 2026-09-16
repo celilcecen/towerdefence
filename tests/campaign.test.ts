@@ -87,6 +87,7 @@ describe("validateCampaign", () => {
     towers: [TEST_TOWER],
     enemies: [TEST_ENEMY],
     powers: [],
+    heroes: [],
     rules: { sellRefundRatio: 0.5, minDamageRatio: 0.2, earlyCallRatio: 0.5 },
     chapters,
   });

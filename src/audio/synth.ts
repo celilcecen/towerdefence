@@ -542,6 +542,36 @@ const CUE_SYNTHS: Readonly<Record<Cue, CueSynth>> = {
     });
     v.tone({ type: "sine", freq: 82.41, attack: 0.02, hold: 0.15, decay: 0.5, peak: 0.3 });
   },
+  "shot-hero": (v) => {
+    v.tone({ type: "triangle", freq: 1900, to: 1200, decay: 0.05, peak: 0.05 });
+    v.tone({ type: "sine", freq: 2800, to: 1500, decay: 0.035, peak: 0.03 });
+    v.noise({ filter: { type: "highpass", freq: 7000 }, decay: 0.02, peak: 0.025 });
+  },
+  dash: (v) => {
+    v.noise({
+      filter: { type: "bandpass", freq: 600, to: 3200, q: 0.9 },
+      attack: 0.01,
+      decay: 0.16,
+      peak: 0.16,
+    });
+    v.tone({ type: "sine", freq: 320, to: 760, decay: 0.12, peak: 0.05 });
+  },
+  nova: (v, size) => {
+    v.tone({ type: "sine", freq: 180, to: 1400, attack: 0.05, decay: 0.28, peak: 0.12 });
+    [NOTE.C5, NOTE.G5, NOTE.C6, NOTE.E6].forEach((freq, i) => {
+      v.tone({ type: "triangle", freq, delay: 0.12 + i * 0.03, decay: 0.5, peak: 0.07 });
+    });
+    boom(v, 0.6 + size * 0.4, 0.1);
+  },
+  "hero-down": (v) => {
+    v.tone({ type: "sawtooth", freq: 420, to: 70, decay: 0.55, peak: 0.08 });
+    v.tone({ type: "sine", freq: 210, to: 45, decay: 0.6, peak: 0.22 });
+    v.noise({ filter: { type: "lowpass", freq: 1200, to: 200 }, decay: 0.4, peak: 0.16 });
+  },
+  "hero-up": (v) => {
+    chime(v, [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6], 0.06, 0.1);
+    v.noise({ filter: { type: "highpass", freq: 6000 }, attack: 0.05, decay: 0.3, peak: 0.05 });
+  },
   tap: (v) => {
     v.tone({ type: "sine", freq: 1100, to: 700, decay: 0.04, peak: 0.16 });
     v.tone({ type: "triangle", freq: 2200, decay: 0.015, peak: 0.04 });
@@ -581,6 +611,7 @@ const TUNED: ReadonlySet<Cue> = new Set<Cue>([
   "star",
   "tap",
   "denied",
+  "hero-up",
 ]);
 
 /** Schedules one play of a cue on the sfx bus. `size` is 0..1, as chosen by cues.ts. */

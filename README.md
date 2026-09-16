@@ -23,15 +23,17 @@ A maze-building tower defense game for the browser.
 Your towers are the walls. Enemies always take the shortest open route to the exit, so every
 tower you place reshapes the maze they have to walk. You can never seal the path completely;
 the game checks every placement before accepting it. Hold 15 waves across four tower types,
-three upgrade levels and four targeting strategies. Works with mouse, keyboard and touch.
+three upgrade levels and four targeting strategies. And you are on the field too: the Sentinel
+runs the maze you build, fires at anything in reach, dashes through gaps and unleashes a crystal
+Nova when charged. Works with mouse, keyboard and touch (a virtual stick on phones).
 
 ## At a glance
 
 |                      |                                                                                    |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | Runtime dependencies | **0**. TypeScript, Canvas 2D and the DOM only                                      |
-| Unit tests           | **142**, with **99% statement / 96% branch** coverage of all game logic            |
-| End-to-end tests     | **14**. Playwright on desktop and mobile Chromium, under the production CSP        |
+| Unit tests           | **275**, with **99% statement / 96% branch** coverage of all game logic            |
+| End-to-end tests     | **26**. Playwright on desktop and mobile Chromium, under the production CSP        |
 | Art assets           | **0 files**. Every tower, enemy and effect is drawn in code and cached as a sprite |
 | Balance guardrails   | Headless bots play the full campaign on 8 seeds in CI                              |
 | Static analysis      | `strictTypeChecked` ESLint, strictest TypeScript flags, CodeQL `security-extended` |
@@ -74,9 +76,11 @@ the core.
 1. The browser loop ([`game-loop.ts`](src/app/game-loop.ts)) accumulates real time and runs
    whole ticks of exactly 1/30 s, independent of display refresh rate.
 2. Player intent arrives as serialisable [commands](src/core/commands.ts) (`placeTower`,
-   `upgradeTower`, `sellTower`, `setTargeting`, `startWave`), validated at runtime.
-3. [`Simulation.step()`](src/core/simulation.ts) runs five systems in a fixed order: spawn →
-   move → towers → projectiles → resolution.
+   `upgradeTower`, `sellTower`, `setTargeting`, `startWave`, `castPower`, `moveHero`,
+   `heroDash`, `heroNova`), validated at runtime. Even the hero's stick input is a command, so
+   a replay log reproduces a whole game, hero and all.
+3. [`Simulation.step()`](src/core/simulation.ts) runs its systems in a fixed order: spawn →
+   move → abilities → hero → towers → projectiles → resolution.
 4. The renderer draws a read-only `WorldView`, interpolating between ticks for smooth motion.
    Procedural [artwork](src/render/art) is painted once per cell size into a
    [`SpriteCache`](src/render/sprite-cache.ts), so a frame is mostly `drawImage` calls; the

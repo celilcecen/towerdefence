@@ -1,7 +1,8 @@
 import { applyDamage } from "../combat/damage";
 import { distance } from "../geometry";
+import { chargeNova } from "../hero";
 import type { EnemyState, ProjectileState } from "../state";
-import { canHit } from "../state";
+import { canHit, HERO_ID } from "../state";
 import type { System, TickContext } from "../tick";
 
 function impact(
@@ -9,17 +10,21 @@ function impact(
   projectile: ProjectileState,
   target: EnemyState | undefined,
 ): void {
+  let dealt = 0;
   if (projectile.splashRadius > 0) {
     const center = { x: projectile.x, y: projectile.y };
     ctx.events.emit("explosion", { ...center, radius: projectile.splashRadius });
     for (const enemy of ctx.world.enemies) {
       if (canHit(projectile.hitsAir, enemy) && distance(center, enemy) <= projectile.splashRadius) {
-        applyDamage(ctx, enemy, projectile.damage);
+        dealt += applyDamage(ctx, enemy, projectile.damage);
       }
     }
-    return;
+  } else if (target) {
+    dealt = applyDamage(ctx, target, projectile.damage);
   }
-  if (target) applyDamage(ctx, target, projectile.damage);
+  // The hero's own hits charge its nova; tower hits do not.
+  const { hero } = ctx.world;
+  if (hero && projectile.towerId === HERO_ID && dealt > 0) chargeNova(hero, dealt);
 }
 
 /** Homing shots. If the target dies mid-flight the shot lands where it was last seen. */

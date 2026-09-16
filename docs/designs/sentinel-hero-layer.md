@@ -7,17 +7,20 @@ Status: APPROVED
 Mode: Builder
 
 ## Problem Statement
+
 Tower defense reads as "place, then watch". The goal of Gridlock is to impress
 (portfolio for a game-studio tech lead role, then the stores). The player asked
-for a game where you *shoot*, with the best graphics we can draw.
+for a game where you _shoot_, with the best graphics we can draw.
 
 ## What Makes This Cool
+
 You build the maze **and** fight inside it. A hero (the Sentinel) runs on the
 board, auto-fires at anything in reach, dashes through gaps and unleashes a
 crystal Nova when charged. Towers still do the heavy lifting; the hero is the
 "whoa" on top: motion, light, particles, screen shake, a body on the field.
 
 ## Premises
+
 - Keep everything already built (story, 12 levels, mobile shell, 242 tests,
   balance bot). The hero is a layer, not a rewrite.
 - Deterministic core stays DOM-free: hero input is a command (`moveHero`),
@@ -28,6 +31,7 @@ crystal Nova when charged. Towers still do the heavy lifting; the hero is the
   bottom-right, keyboard (WASD/arrows, Shift, Q) on desktop.
 
 ## Approaches Considered
+
 - **A) Hero layer inside Gridlock** (chosen): move, auto-aim fire, dash with
   i-frames, Nova, contact damage, respawn at the crystal.
 - **B) Separate arcade shooter**: rejected — restarts story/mobile/store work
@@ -36,6 +40,7 @@ crystal Nova when charged. Towers still do the heavy lifting; the hero is the
   feeling.
 
 ## Recommended Approach
+
 A. Core: `HeroDef`/`HeroState`, `HeroSystem`, commands `moveHero`, `heroDash`,
 `heroNova`, events for FX/audio, hash + validation + tests. App: session
 helpers, virtual stick + buttons, keyboard. Render: procedural hero art,
@@ -44,10 +49,12 @@ bolt trail, dash ghosts, Nova ring, hurt vignette. Content: one hero
 Nova tip.
 
 ## Open Questions
+
 - Should enemies ever target the hero (ranged)? Not in v1: contact damage only.
 - Second hero (e.g. a frost archer) as an unlock? Later.
 
 ## Success Criteria
+
 - Every level still winnable by the maze bot without the hero.
 - Hero playable with one thumb on a 360×720 phone without covering the board.
 - `npm run verify` green; coverage thresholds hold.

@@ -22,5 +22,13 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "e2e", "deploy", "vite.config.ts", "playwright.config.ts", "capacitor.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "deploy",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "capacitor.config.ts"
+  ]
 }

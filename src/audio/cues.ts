@@ -1,4 +1,5 @@
 import type { GameEvents } from "../core/game-events";
+import { HERO_ID } from "../core/state";
 
 /**
  * Sound cues are named, not synthesized, here. This module only decides which
@@ -8,6 +9,7 @@ export const GAME_CUES = [
   "shot-bolt",
   "shot-cannon",
   "shot-mortar",
+  "shot-hero",
   "beam",
   "frost",
   "arc",
@@ -29,6 +31,10 @@ export const GAME_CUES = [
   "defeat",
   "meteor",
   "freeze",
+  "dash",
+  "nova",
+  "hero-down",
+  "hero-up",
 ] as const;
 
 /** Cues the UI plays directly rather than through simulation events. */
@@ -98,12 +104,20 @@ export const EVENT_CUES: EventCues = {
   enemySplit: ({ count }) => one("split", clamp01(count / 6)),
   enemyHealed: () => one("heal"),
   projectileFired: ({ projectile }, { towerKindOf }) =>
-    one(shotCue(towerKindOf(projectile.towerId), projectile.splashRadius)),
+    projectile.towerId === HERO_ID
+      ? one("shot-hero")
+      : one(shotCue(towerKindOf(projectile.towerId), projectile.splashRadius)),
   explosion: ({ radius }) => one("boom", clamp01((radius - 0.8) / 1)),
   beamFired: () => one("beam"),
   pulseFired: () => one("frost"),
   chainFired: ({ targets }) => one("arc", clamp01((targets.length - 1) / 5)),
   powerCast: ({ power }) => one(power.spec.kind === "strike" ? "meteor" : "freeze", 1),
+  heroFired: () => none,
+  heroHurt: () => none,
+  heroDowned: () => one("hero-down", 1),
+  heroRespawned: () => one("hero-up", 1),
+  heroDashed: () => one("dash"),
+  heroNova: ({ targets }) => one("nova", clamp01(targets / 6)),
   waveStarted: ({ early }) => (early ? [...one("wave-start"), ...one("coins")] : one("wave-start")),
   waveCleared: () => one("wave-clear"),
   gameOver: ({ won }) => one(won ? "victory" : "defeat", 1),

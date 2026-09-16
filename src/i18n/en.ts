@@ -71,6 +71,11 @@ export const en = {
     powerCooldown: (seconds: number) => `${seconds}s`,
     powerAim: "Tap the field to aim. Tap the power again to cancel.",
     hotkey: (key: string) => `Hotkey ${key}`,
+    stick: "Move the Sentinel",
+    dash: "Dash",
+    nova: "Nova",
+    novaCharging: "Charging",
+    heroDown: (seconds: number) => `Sentinel down · back in ${seconds}s`,
   },
   hints: {
     pickTower: "Pick a tower below, then tap a tile to build it.",
@@ -178,7 +183,7 @@ export const en = {
     ] as readonly (readonly [string, string])[],
     towers: "Your towers",
     enemies: "Enemies",
-    keys: "1–6 build · Space next wave · U upgrade · S sell · P pause · F speed · Esc cancel",
+    keys: "1–6 build · Space next wave · U upgrade · X sell · P pause · F speed · Esc cancel · WASD move · Shift dash · R nova",
     close: "Got it",
   },
   speakers: {
@@ -203,6 +208,7 @@ export const en = {
       walls:
         "See the arrows bend? Towers are walls. The monsters must walk around them, and a longer road gives your towers more time to shoot.",
       more: "Build two more Bolts on the glowing tiles to stretch the road even further.",
+      hero: "That's you: the Sentinel by the crystal. Drag the stick to run. You fire at anything in reach, so stand where the road bends.",
       start: "Ready. Tap Start wave to let them come.",
       watch:
         "Every kill earns gold. Every monster that reaches the crystal costs lives. Clear the wave for a bonus.",
@@ -216,11 +222,16 @@ export const en = {
         "Flyers ignore your walls and head straight for the crystal. Only firepower stops them, so put towers along their line.",
       healer:
         "A Mender heals every monster near it. Kill it first: set a tower to Strongest, or drop a power on it.",
-      splitter: "Broods burst into broodlings when they die. Splash and chain towers clear the swarm.",
+      splitter:
+        "Broods burst into broodlings when they die. Splash and chain towers clear the swarm.",
       boss: "A boss is coming. If it reaches the crystal you lose 20 lives at once. Keep it walking and hit it with everything.",
-      power: "Your power is ready. Tap it, then tap the field. Powers recharge only while a wave runs.",
+      power:
+        "Your power is ready. Tap it, then tap the field. Powers recharge only while a wave runs.",
       early:
         "Every monster in this wave is out. Call the next wave now for bonus gold, if you're confident.",
+      nova: "Your Nova is charged. Tap it when monsters crowd around you: it hits and slows everything nearby.",
+      downed:
+        "The Sentinel fell. Touching monsters hurts, and bosses hurt a lot. You'll be back at the crystal in a few seconds; Dash to slip past them.",
     },
   },
   dialogue: {
@@ -300,6 +311,10 @@ export const en = {
     "unknown-power": "That power isn't available here.",
     "power-not-ready": "That power is still recharging.",
     "no-wave-active": "Powers can only be used during a wave.",
+    "no-hero": "There is no hero in this level.",
+    "hero-down": "The Sentinel is down.",
+    "dash-not-ready": "Dash is recharging.",
+    "nova-not-charged": "Nova isn't charged yet. Hit monsters to fill it.",
   },
   towers: {
     bolt: { name: "Bolt", summary: "Cheap and quick. The backbone of every maze." },
@@ -327,6 +342,12 @@ export const en = {
     broodling: "Broodling",
     tyrant: "Rift Tyrant",
   } as Readonly<Record<string, string>>,
+  heroes: {
+    sentinel: {
+      name: "Sentinel",
+      summary: "You. Runs the maze, fires at anything in reach, dashes through gaps.",
+    },
+  },
   powers: {
     meteor: { name: "Meteor", summary: "Call down a meteor on any spot. Hits ground and air." },
     frostbind: { name: "Frostbind", summary: "Freeze the whole field for a few seconds." },

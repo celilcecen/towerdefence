@@ -135,6 +135,58 @@ export interface PowerDef {
   readonly spec: PowerSpec;
 }
 
+export interface HeroAttack {
+  readonly damage: number;
+  /** Seconds between shots. */
+  readonly cooldown: number;
+  /** Cells. Enemies further away are ignored. */
+  readonly range: number;
+  /** Cells per second. */
+  readonly speed: number;
+}
+
+export interface HeroDash {
+  /** Cells covered by one dash. */
+  readonly distance: number;
+  /** Seconds the dash lasts; the hero cannot be hurt meanwhile. */
+  readonly duration: number;
+  /** Seconds before the next dash. */
+  readonly cooldown: number;
+}
+
+export interface HeroNova {
+  readonly damage: number;
+  /** Cells around the hero. */
+  readonly radius: number;
+  readonly slow: SlowEffect;
+  /** Damage the hero must deal with shots to charge one nova. */
+  readonly charge: number;
+}
+
+/**
+ * The player's avatar on the board. It walks the same maze as the enemies,
+ * fires at whatever comes in reach and is hurt by touching them.
+ */
+export interface HeroDef {
+  readonly id: string;
+  readonly name: string;
+  readonly summary: string;
+  readonly hp: number;
+  /** Cells per second. */
+  readonly speed: number;
+  /** Cells. Collision and rendering size. */
+  readonly radius: number;
+  readonly attack: HeroAttack;
+  readonly dash: HeroDash;
+  readonly nova: HeroNova;
+  /** Hit points lost per second for each touching enemy, times that enemy's leakDamage. */
+  readonly contactDamage: number;
+  /** Hit points regained per second while nothing touches the hero. */
+  readonly regen: number;
+  /** Seconds the hero is out of action after falling. */
+  readonly respawn: number;
+}
+
 export interface MapDef {
   readonly id: string;
   readonly name: string;
@@ -158,6 +210,8 @@ export interface GameContent {
   readonly enemies: readonly EnemyDef[];
   readonly waves: readonly WaveDef[];
   readonly powers: readonly PowerDef[];
+  /** Absent: the level is played with towers alone. */
+  readonly hero?: HeroDef;
   readonly map: MapDef;
   readonly rules: RulesDef;
 }
@@ -170,6 +224,8 @@ export interface LevelDef {
   /** Tower ids available to build, in dock order. */
   readonly towers: readonly string[];
   readonly powers: readonly string[];
+  /** Hero id the player controls in this level, if any. */
+  readonly hero?: string;
   readonly startingGold: number;
   readonly startingLives: number;
 }
@@ -185,6 +241,7 @@ export interface CampaignDef {
   readonly towers: readonly TowerDef[];
   readonly enemies: readonly EnemyDef[];
   readonly powers: readonly PowerDef[];
+  readonly heroes: readonly HeroDef[];
   readonly rules: Omit<RulesDef, "startingGold" | "startingLives">;
   readonly chapters: readonly ChapterDef[];
 }

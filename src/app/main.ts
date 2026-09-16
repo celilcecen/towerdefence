@@ -16,6 +16,7 @@ import { CanvasRenderer } from "../render/renderer";
 import { canvasSurface } from "../render/surface";
 import { requireElement } from "../ui/dom";
 import { CoachUi, DialogueUi } from "../ui/coach-ui";
+import { HeroControls } from "../ui/hero-controls";
 import { SceneUi } from "../ui/scene-ui";
 import { GameHud } from "../ui/hud";
 import { ScreensUi } from "../ui/screens";
@@ -96,6 +97,15 @@ function main(): void {
       events.on("powerCast", () => {
         haptic("heavy");
       }),
+      events.on("heroDashed", () => {
+        haptic("light");
+      }),
+      events.on("heroNova", () => {
+        haptic("heavy");
+      }),
+      events.on("heroDowned", () => {
+        haptic("warning");
+      }),
       events.on("gameOver", ({ won }) => {
         haptic(won ? "success" : "warning");
       }),
@@ -107,6 +117,7 @@ function main(): void {
   let detachVisuals = attachVisuals();
 
   const hud = new GameHud(document, app, pixelRatio(), strings);
+  const heroControls = new HeroControls(document, app, renderer, strings);
   const screens = new ScreensUi(document, app, pixelRatio(), strings, {
     version: APP_VERSION,
     notify: (message) => {
@@ -156,6 +167,7 @@ function main(): void {
     strings = next;
     translateDom(document, strings);
     hud.setStrings(strings);
+    heroControls.setStrings(strings);
     screens.setStrings(strings);
     coachUi.setStrings(strings);
     dialogue.setStrings(strings);
@@ -186,6 +198,7 @@ function main(): void {
         guide: guide?.filter((cell) => session.simulation.grid.isBuildable(cell.x, cell.y)),
       });
       hud.render();
+      heroControls.render();
       screens.render();
       coachUi.render();
       scenes.render(clock(), pixelRatio());

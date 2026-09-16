@@ -55,6 +55,11 @@ export const tr: Strings = {
     powerCooldown: (seconds: number) => `${seconds} sn`,
     powerAim: "Nişan almak için alana dokun. İptal için güce tekrar dokun.",
     hotkey: (key: string) => `Kısayol ${key}`,
+    stick: "Muhafızı hareket ettir",
+    dash: "Atıl",
+    nova: "Nova",
+    novaCharging: "Doluyor",
+    heroDown: (seconds: number) => `Muhafız düştü · ${seconds} sn sonra döner`,
   },
   hints: {
     pickTower: "Aşağıdan bir kule seç, sonra bir kareye dokunup inşa et.",
@@ -162,7 +167,7 @@ export const tr: Strings = {
     ],
     towers: "Kulelerin",
     enemies: "Düşmanlar",
-    keys: "1–6 inşa · Boşluk sıradaki dalga · U yükselt · S sat · P duraklat · F hız · Esc iptal",
+    keys: "1–6 inşa · Boşluk sıradaki dalga · U yükselt · X sat · P duraklat · F hız · Esc iptal · WASD hareket · Shift atıl · R nova",
     close: "Anladım",
   },
   speakers: {
@@ -187,6 +192,7 @@ export const tr: Strings = {
       walls:
         "Okların nasıl büküldüğünü gördün mü? Kuleler duvardır. Canavarlar etraflarından dolaşmak zorunda ve uzayan yol kulelerine ateş etmek için daha çok zaman kazandırır.",
       more: "Yolu daha da uzatmak için parlayan karelere iki Ok daha kur.",
+      hero: "Bu sensin: kristalin yanındaki Muhafız. Koşmak için çubuğu sürükle. Menzile giren her şeye ateş edersin, o yüzden yolun büküldüğü yerde dur.",
       start: "Hazırsın. Gelsinler diye dalgayı başlat düğmesine dokun.",
       watch:
         "Her öldürme altın kazandırır. Kristale ulaşan her canavar can götürür. Dalgayı temizlersen bonus kazanırsın.",
@@ -200,11 +206,15 @@ export const tr: Strings = {
         "Uçanlar duvarlarını umursamaz, doğrudan kristale gider. Onları sadece ateş gücü durdurur; rotalarına kule diz.",
       healer:
         "Şifacı yakınındaki her canavarı iyileştirir. Önce onu öldür: bir kuleyi En güçlü'ye ayarla ya da üstüne güç kullan.",
-      splitter: "Kuluçkalar ölünce yavrulara bölünür. Alan hasarı ve zincirleme kuleler sürüyü temizler.",
+      splitter:
+        "Kuluçkalar ölünce yavrulara bölünür. Alan hasarı ve zincirleme kuleler sürüyü temizler.",
       boss: "Bir boss geliyor. Kristale ulaşırsa bir anda 20 can kaybedersin. Onu yürüt ve elindeki her şeyle vur.",
       power: "Gücün hazır. Önce ona, sonra alana dokun. Güçler yalnızca dalga sürerken dolar.",
       early:
         "Bu dalganın tüm canavarları çıktı. Kendine güveniyorsan bonus altın için sıradaki dalgayı şimdi çağır.",
+      nova: "Nova doldu. Canavarlar etrafını sardığında bas: yakındaki her şeye vurur ve yavaşlatır.",
+      downed:
+        "Muhafız düştü. Canavarlara değmek can yakar, patronlar çok yakar. Birkaç saniyeye kristalin başına dönersin; aralarından sıyrılmak için Atıl.",
     },
   },
   dialogue: {
@@ -214,7 +224,8 @@ export const tr: Strings = {
       last: "Son dalga. Bunu tutarsak Geçit bizim!",
     },
     "c1-fords": {
-      fords: "İki sığlıktan birden. Yolların birleştiği yerde bir Ayaz kulesi değerli saniyeler kazandırır.",
+      fords:
+        "İki sığlıktan birden. Yolların birleştiği yerde bir Ayaz kulesi değerli saniyeler kazandırır.",
       meteor: "Kümeleniyorlar. Meteor tam bunun için!",
       last: "Nehir neredeyse temiz. Son bir hamle.",
     },
@@ -227,7 +238,8 @@ export const tr: Strings = {
       cold: "Soğuk seni kurtarmayacak. Bu dünyada hiçbir şey kurtarmayacak.",
     },
     "c2-pass": {
-      mender: "Şu yeşil ışığı görüyor musun? Bir Şifacı. Önce onu öldürmezsen yanında hiçbir şey ölmez.",
+      mender:
+        "Şu yeşil ışığı görüyor musun? Bir Şifacı. Önce onu öldürmezsen yanında hiçbir şey ölmez.",
       focus: "Önce şifacılar, gerisi kendiliğinden düşer.",
     },
     "c2-gate": {
@@ -284,6 +296,10 @@ export const tr: Strings = {
     "unknown-power": "Bu güç burada kullanılamaz.",
     "power-not-ready": "Bu güç hâlâ doluyor.",
     "no-wave-active": "Güçler yalnızca dalga sırasında kullanılabilir.",
+    "no-hero": "Bu bölümde kahraman yok.",
+    "hero-down": "Muhafız yerde.",
+    "dash-not-ready": "Atılma doluyor.",
+    "nova-not-charged": "Nova henüz dolmadı. Doldurmak için canavarlara vur.",
   },
   towers: {
     bolt: { name: "Ok", summary: "Ucuz ve seri. Her labirentin bel kemiği." },
@@ -313,6 +329,12 @@ export const tr: Strings = {
     brood: "Kuluçka",
     broodling: "Yavru",
     tyrant: "Yarık Tiranı",
+  },
+  heroes: {
+    sentinel: {
+      name: "Muhafız",
+      summary: "Sensin. Labirentte koşar, menzile gireni vurur, aralıklardan atılır.",
+    },
   },
   powers: {
     meteor: {

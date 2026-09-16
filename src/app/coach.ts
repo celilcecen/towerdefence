@@ -53,6 +53,14 @@ const towers = (s: GameSession): number => s.simulation.world.towers.length;
 const holdingBolt = (s: GameSession): boolean =>
   s.selection.kind === "build" && s.selection.tower === "bolt";
 const upgraded = (s: GameSession): boolean => s.simulation.world.towers.some((t) => t.level > 0);
+const STICK: Anchor = { kind: "element", selector: "#stick" };
+/** The hero has been steered away from where it started. */
+const heroMoved = (s: GameSession): boolean => {
+  const { hero } = s.simulation.world;
+  if (!hero) return true;
+  const home = s.simulation.grid.exits[0];
+  return !home || Math.hypot(hero.x - home.x - 0.5, hero.y - home.y - 0.5) > 0.6;
+};
 
 export const TUTORIAL: readonly Step[] = [
   { id: "welcome", anchor: () => ({ kind: "landmarks" }) },
@@ -72,6 +80,11 @@ export const TUTORIAL: readonly Step[] = [
     done: (s) => towers(s) >= 3,
   },
   {
+    id: "hero",
+    anchor: (s) => (s.hero ? STICK : { kind: "none" }),
+    done: heroMoved,
+  },
+  {
     id: "start",
     anchor: () => ({ kind: "element", selector: "#next-wave" }),
     done: (s) => s.simulation.world.wavesStarted >= 1,
@@ -83,7 +96,7 @@ export const TUTORIAL: readonly Step[] = [
   },
   {
     id: "inspect",
-    anchor: (s) => {
+    anchor: (s: GameSession): Anchor => {
       const tower = s.simulation.world.towers[0];
       return tower ? { kind: "cells", cells: [tower] } : { kind: "none" };
     },
@@ -123,6 +136,16 @@ export const TIPS: readonly Tip[] = [
     id: "early",
     when: (s) => s.simulation.world.phase === "wave" && s.simulation.canStartWave,
     anchor: { kind: "element", selector: "#next-wave" },
+  },
+  {
+    id: "nova",
+    when: (s) => (s.hero?.charge ?? 0) >= 1,
+    anchor: { kind: "element", selector: "#nova" },
+  },
+  {
+    id: "downed",
+    when: (s) => s.hero?.status === "down",
+    anchor: { kind: "none" },
   },
 ];
 
@@ -165,7 +188,14 @@ export class Coach {
   get view(): CoachView | undefined {
     const { session } = this.app;
     if (this.tip) {
-      return { kind: "tip", id: this.tip.id, anchor: this.tip.anchor, tap: true, step: 0, steps: 0 };
+      return {
+        kind: "tip",
+        id: this.tip.id,
+        anchor: this.tip.anchor,
+        tap: true,
+        step: 0,
+        steps: 0,
+      };
     }
     const step = TUTORIAL[this.index];
     if (!this.tutorialActive || !step) return undefined;
@@ -236,7 +266,9 @@ export class Coach {
 
   private advance(): void {
     const { session } = this.app;
-    for (let guard = 0; guard < TUTORIAL.length; guard++) {
+    // Bounded: a step can be crossed at most once per update.
+    let guard = TUTORIAL.length;
+    while (guard-- > 0) {
       const step = TUTORIAL[this.index];
       if (!step) break;
       if (step.done?.(session)) {

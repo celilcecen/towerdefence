@@ -16,7 +16,11 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const out = join(root, "assets");
 const BACKGROUND = "#0a0e13";
 
-const server = await createServer({ root, server: { port: 5199, strictPort: false }, logLevel: "error" });
+const server = await createServer({
+  root,
+  server: { port: 5199, strictPort: false },
+  logLevel: "error",
+});
 await server.listen();
 const url = server.resolvedUrls?.local[0];
 if (!url) throw new Error("Vite did not report a local URL.");

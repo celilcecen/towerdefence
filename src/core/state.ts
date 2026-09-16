@@ -1,4 +1,11 @@
-import type { EnemyDef, SpawnGroup, TargetingMode, TowerDef, TowerLevel } from "./content-types";
+import type {
+  EnemyDef,
+  HeroDef,
+  SpawnGroup,
+  TargetingMode,
+  TowerDef,
+  TowerLevel,
+} from "./content-types";
 import type { Cell, Point } from "./geometry";
 
 export type Phase = "building" | "wave" | "won" | "lost";
@@ -65,6 +72,35 @@ export interface SpawnCursor {
   timer: number;
 }
 
+export type HeroStatus = "alive" | "down";
+
+export interface HeroState {
+  readonly def: HeroDef;
+  x: number;
+  y: number;
+  prevX: number;
+  prevY: number;
+  hp: number;
+  /** Direction the hero looks, in radians, world space. */
+  facing: number;
+  /** Requested movement, a vector of length 0 to 1. */
+  moveX: number;
+  moveY: number;
+  attackCooldown: number;
+  dashCooldown: number;
+  /** Seconds left in the current dash; the hero cannot be hurt while it runs. */
+  dashTimer: number;
+  dashX: number;
+  dashY: number;
+  /** Nova charge, 0 to 1. */
+  charge: number;
+  /** The enemy the hero last shot at, for aiming visuals. */
+  targetId: number | undefined;
+  status: HeroStatus;
+  /** Seconds until a fallen hero returns. */
+  respawnTimer: number;
+}
+
 export interface PowerState {
   readonly id: string;
   /** Seconds until the power is ready. */
@@ -84,6 +120,8 @@ export interface WorldState {
   projectiles: ProjectileState[];
   spawnQueue: SpawnCursor[];
   powers: PowerState[];
+  /** Undefined when the level has no hero. */
+  hero: HeroState | undefined;
   nextId: number;
 }
 
@@ -99,9 +137,13 @@ export interface WorldView {
   readonly towers: readonly Readonly<TowerState>[];
   readonly projectiles: readonly Readonly<ProjectileState>[];
   readonly powers: readonly Readonly<PowerState>[];
+  readonly hero: Readonly<HeroState> | undefined;
   /** Enemies still to be released by the waves in progress. */
   readonly spawnQueue: readonly Readonly<SpawnCursor>[];
 }
+
+/** The `towerId` carried by the hero's shots. Tower ids start at 1, so it never collides. */
+export const HERO_ID = 0;
 
 export function towerCenter(tower: Pick<TowerState, "x" | "y">): Point {
   return { x: tower.x + 0.5, y: tower.y + 0.5 };

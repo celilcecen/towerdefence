@@ -5,7 +5,7 @@ import { EventBus } from "../core/events";
 import type { Cell } from "../core/geometry";
 import { cellCenter } from "../core/geometry";
 import { Simulation } from "../core/simulation";
-import type { PowerState, TowerState } from "../core/state";
+import type { HeroState, PowerState, TowerState } from "../core/state";
 import type { LoopControl } from "./game-loop";
 
 export type Selection =
@@ -145,6 +145,36 @@ export class GameSession implements LoopControl {
 
   powerState(power: string): Readonly<PowerState> | undefined {
     return this.sim.world.powers.find((p) => p.id === power);
+  }
+
+  /** The player's hero on the board, if this level has one. */
+  get hero(): Readonly<HeroState> | undefined {
+    return this.sim.world.hero;
+  }
+
+  /**
+   * Steers the hero. Called every time the stick or the keys change; a zero
+   * vector stops. Silently ignored on levels without a hero, so input
+   * bindings need no special case.
+   */
+  moveHero(dx: number, dy: number): void {
+    const { hero } = this.sim.world;
+    if (!hero || !this.started || this.paused) return;
+    if (hero.moveX === dx && hero.moveY === dy) return;
+    this.dispatch({ type: "moveHero", dx, dy });
+  }
+
+  /** Stops the hero, for when input focus is lost mid-press. */
+  stopHero(): void {
+    this.moveHero(0, 0);
+  }
+
+  dash(): void {
+    if (this.hero && this.started && !this.paused) this.dispatch({ type: "heroDash" });
+  }
+
+  nova(): void {
+    if (this.hero && this.started && !this.paused) this.dispatch({ type: "heroNova" });
   }
 
   cancel(): void {

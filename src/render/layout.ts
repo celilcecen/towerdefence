@@ -59,6 +59,11 @@ export function screenAngle(layout: BoardLayout, angle: number): number {
   return layout.rotated ? angle + Math.PI / 2 : angle;
 }
 
+/** A direction on screen (x right, y down) as a direction on the board. Inverse of toScreen's rotation. */
+export function worldDirection(layout: BoardLayout, dx: number, dy: number): Point {
+  return layout.rotated ? { x: dy, y: -dx } : { x: dx, y: dy };
+}
+
 /** Maps a point in CSS pixels, relative to the canvas, to a board cell. */
 export function pointToCell(layout: BoardLayout, px: number, py: number): Cell | undefined {
   const { cellSize, offsetX, offsetY, columns, rows, rotated } = layout;

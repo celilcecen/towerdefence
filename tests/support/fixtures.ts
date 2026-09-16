@@ -1,5 +1,11 @@
 import { ContentRegistry } from "../../src/core/content-registry";
-import type { EnemyDef, GameContent, TowerDef, WaveDef } from "../../src/core/content-types";
+import type {
+  EnemyDef,
+  GameContent,
+  HeroDef,
+  TowerDef,
+  WaveDef,
+} from "../../src/core/content-types";
 import { EventBus } from "../../src/core/events";
 import { FlowField } from "../../src/core/flow-field";
 import type { GameEvents } from "../../src/core/game-events";
@@ -41,6 +47,21 @@ export const TEST_ENEMY: EnemyDef = {
   bounty: 5,
   leakDamage: 2,
   radius: 0.3,
+};
+
+export const TEST_HERO: HeroDef = {
+  id: "knight",
+  name: "Knight",
+  summary: "Test hero.",
+  hp: 50,
+  speed: 2,
+  radius: 0.3,
+  attack: { damage: 10, cooldown: 0.5, range: 2, speed: 100 },
+  dash: { distance: 1, duration: 0.1, cooldown: 1 },
+  nova: { damage: 40, radius: 1.5, slow: { factor: 0.5, duration: 1 }, charge: 20 },
+  contactDamage: 10,
+  regen: 5,
+  respawn: 1,
 };
 
 export const singleWave = (overrides: Partial<WaveDef> = {}): WaveDef => ({
@@ -122,6 +143,7 @@ export function makeTickContext(overrides: Partial<GameContent> = {}): TickConte
     projectiles: [],
     spawnQueue: [],
     powers: [],
+    hero: undefined,
     nextId: 100,
   };
   return {

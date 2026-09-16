@@ -1,4 +1,11 @@
-import type { AttackSpec, EnemyDef, GameContent, PowerDef, TowerDef } from "./content-types";
+import type {
+  AttackSpec,
+  EnemyDef,
+  GameContent,
+  HeroDef,
+  PowerDef,
+  TowerDef,
+} from "./content-types";
 import { TARGETING_MODES } from "./content-types";
 import { FlowField } from "./flow-field";
 import { Grid, GridParseError } from "./grid";
@@ -118,6 +125,32 @@ function validatePower(power: PowerDef): string[] {
   return errors;
 }
 
+function validateHero(hero: HeroDef): string[] {
+  const where = `Hero "${hero.id}"`;
+  const errors: string[] = [];
+  if (!isPositive(hero.hp)) errors.push(`${where}: hp must be positive.`);
+  if (!isPositive(hero.speed)) errors.push(`${where}: speed must be positive.`);
+  if (!(hero.radius > 0 && hero.radius <= 0.5))
+    errors.push(`${where}: radius must be in (0, 0.5].`);
+  if (!isPositive(hero.attack.damage)) errors.push(`${where}: attack damage must be positive.`);
+  if (!isPositive(hero.attack.cooldown)) errors.push(`${where}: attack cooldown must be positive.`);
+  if (!isPositive(hero.attack.range)) errors.push(`${where}: attack range must be positive.`);
+  if (!isPositive(hero.attack.speed)) errors.push(`${where}: attack speed must be positive.`);
+  if (!isPositive(hero.dash.distance)) errors.push(`${where}: dash distance must be positive.`);
+  if (!isPositive(hero.dash.duration)) errors.push(`${where}: dash duration must be positive.`);
+  if (!isPositive(hero.dash.cooldown)) errors.push(`${where}: dash cooldown must be positive.`);
+  if (!isPositive(hero.nova.damage)) errors.push(`${where}: nova damage must be positive.`);
+  if (!isPositive(hero.nova.radius)) errors.push(`${where}: nova radius must be positive.`);
+  if (!isPositive(hero.nova.charge)) errors.push(`${where}: nova charge must be positive.`);
+  if (!isRatio(hero.nova.slow.factor)) errors.push(`${where}: nova slow factor must be in (0, 1].`);
+  if (!isPositive(hero.nova.slow.duration))
+    errors.push(`${where}: nova slow duration must be positive.`);
+  if (!isNonNegative(hero.contactDamage)) errors.push(`${where}: contactDamage must be >= 0.`);
+  if (!isNonNegative(hero.regen)) errors.push(`${where}: regen must be >= 0.`);
+  if (!isPositive(hero.respawn)) errors.push(`${where}: respawn must be positive.`);
+  return errors;
+}
+
 /**
  * Validates content once at startup, so the simulation can trust it and no
  * gameplay code needs defensive checks for impossible data. Returns every
@@ -125,7 +158,7 @@ function validatePower(power: PowerDef): string[] {
  */
 export function validateContent(content: GameContent): string[] {
   const errors: string[] = [];
-  const { towers, enemies, waves, powers, rules, map } = content;
+  const { towers, enemies, waves, powers, hero, rules, map } = content;
 
   if (towers.length === 0) errors.push("At least one tower is required.");
   for (const id of duplicates(towers.map((t) => t.id))) errors.push(`Duplicate tower id "${id}".`);
@@ -141,6 +174,7 @@ export function validateContent(content: GameContent): string[] {
 
   for (const id of duplicates(powers.map((p) => p.id))) errors.push(`Duplicate power id "${id}".`);
   powers.forEach((power) => errors.push(...validatePower(power)));
+  if (hero) errors.push(...validateHero(hero));
 
   if (waves.length === 0) errors.push("At least one wave is required.");
   waves.forEach((wave, w) => {

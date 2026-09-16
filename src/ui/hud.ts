@@ -272,7 +272,12 @@ export class GameHud {
         "button",
         {
           className: "build-card",
-          attrs: { type: "button", "aria-pressed": "false", title: summary, "data-tower": tower.id },
+          attrs: {
+            type: "button",
+            "aria-pressed": "false",
+            title: summary,
+            "data-tower": tower.id,
+          },
         },
         [
           icon,

@@ -7,16 +7,18 @@ export function damageAfterArmor(raw: number, armor: number, minDamageRatio: num
   return Math.max(raw * minDamageRatio, raw - armor);
 }
 
+/** Returns the damage that landed after armor; it may exceed the hit points left. */
 export function applyDamage(
   ctx: Pick<TickContext, "content" | "events">,
   enemy: EnemyState,
   raw: number,
-): void {
-  if (enemy.status !== "alive") return;
+): number {
+  if (enemy.status !== "alive") return 0;
   const dealt = damageAfterArmor(raw, enemy.def.armor, ctx.content.rules.minDamageRatio);
   enemy.hp = Math.max(0, enemy.hp - dealt);
   ctx.events.emit("enemyHit", { enemy, damage: dealt });
   if (enemy.hp === 0) enemy.status = "killed";
+  return dealt;
 }
 
 /** Slows do not stack: a stronger slow replaces, an equal one refreshes, a weaker one is ignored. */
